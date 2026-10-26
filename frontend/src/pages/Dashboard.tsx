@@ -52,7 +52,7 @@ export const Dashboard: React.FC = () => {
     [workspaces]
   );
 
-  // Safe roadmap percentage calculation
+  // Accurate roadmap percentage (0% if empty, dynamic if projects exist)
   const roadmapProgress = useMemo(() => {
     if (!workspaces || workspaces.length === 0) {
       return 0;
@@ -85,140 +85,503 @@ export const Dashboard: React.FC = () => {
     navigate('/login');
   };
 
-  // Safe component handle supporting both default and named imports
   const ModalComponent = WorkTrackerModal || WorkTrackerModalNamed;
 
   return (
-    <div className="flex h-screen bg-[#1c1412] text-[#f5ede4]">
+    <div
+      style={{
+        display: 'flex',
+        minHeight: '100vh',
+        backgroundColor: '#261612',
+        color: '#fdf8f4',
+        fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      }}
+    >
       {/* Sidebar */}
-      <aside className="w-64 p-6 flex flex-col justify-between border-r border-[#3b2a26]">
-        <div className="space-y-6">
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-xl bg-[#f5ede4] text-[#1c1412] font-black flex items-center justify-center tracking-wider text-sm">
+      <aside
+        style={{
+          width: '240px',
+          padding: '28px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+          {/* Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                backgroundColor: '#fdf8f4',
+                color: '#261612',
+                fontWeight: 900,
+                fontSize: '13px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               TF
             </div>
-            <h1 className="text-lg font-bold">TestForge AI</h1>
+            <h1 style={{ fontSize: '18px', fontWeight: 700, margin: 0, letterSpacing: '-0.3px' }}>
+              TestForge AI
+            </h1>
           </div>
 
-          <nav className="space-y-2">
-            <button className="w-full text-left px-3.5 py-2.5 rounded-xl bg-[#2d1e1a] text-[#f5ede4] font-medium text-sm flex items-center gap-2.5">
-              <span>📁</span> Projects
+          {/* Navigation Links */}
+          <nav style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <button
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                padding: '10px 14px',
+                borderRadius: '12px',
+                backgroundColor: '#3b2520',
+                color: '#fdf8f4',
+                fontWeight: 600,
+                fontSize: '13px',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+              }}
+            >
+              📁 Projects
             </button>
-            <button className="w-full text-left px-3.5 py-2.5 rounded-xl text-[#a89a95] hover:bg-[#2d1e1a] hover:text-[#f5ede4] font-medium text-sm flex items-center gap-2.5 transition-colors">
-              <span>📄</span> Requirements
+            <button
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                padding: '10px 14px',
+                borderRadius: '12px',
+                backgroundColor: 'transparent',
+                color: '#ab958e',
+                fontWeight: 500,
+                fontSize: '13px',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+              }}
+            >
+              📄 Requirements
             </button>
-            <button className="w-full text-left px-3.5 py-2.5 rounded-xl text-[#a89a95] hover:bg-[#2d1e1a] hover:text-[#f5ede4] font-medium text-sm flex items-center gap-2.5 transition-colors">
-              <span>🧪</span> Test Cases
+            <button
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                padding: '10px 14px',
+                borderRadius: '12px',
+                backgroundColor: 'transparent',
+                color: '#ab958e',
+                fontWeight: 500,
+                fontSize: '13px',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+              }}
+            >
+              🧪 Test Cases
             </button>
             <button
               onClick={() => setIsRoadmapOpen(true)}
-              className="w-full text-left px-3.5 py-2.5 rounded-xl text-[#a89a95] hover:bg-[#2d1e1a] hover:text-[#f5ede4] font-medium text-sm flex items-center gap-2.5 transition-colors"
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                padding: '10px 14px',
+                borderRadius: '12px',
+                backgroundColor: 'transparent',
+                color: '#ab958e',
+                fontWeight: 500,
+                fontSize: '13px',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+              }}
             >
-              <span>🚀</span> Work Roadmap ({roadmapProgress}%)
+              🚀 Work Roadmap ({roadmapProgress}%)
             </button>
           </nav>
         </div>
 
-        {/* User Card */}
-        <div className="space-y-3 pt-4 border-t border-[#3b2a26]">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-[#3b2a26] text-[#f5ede4] font-bold flex items-center justify-center text-xs">
-              {userEmail.substring(0, 2).toUpperCase()}
+        {/* User Card & Sign Out */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              style={{
+                width: '34px',
+                height: '34px',
+                borderRadius: '10px',
+                backgroundColor: '#4a302a',
+                color: '#fdf8f4',
+                fontWeight: 700,
+                fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {userEmail.substring(0, 1).toUpperCase()}
             </div>
-            <div className="truncate">
-              <p className="text-xs font-semibold truncate">{userEmail.split('@')[0]}</p>
-              <p className="text-[10px] text-[#a89a95]">Pro Workspace</p>
+            <div style={{ overflow: 'hidden' }}>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                  textOverflow: 'ellipsis',
+                  overflow: 'hidden',
+                }}
+              >
+                {userEmail.split('@')[0]}
+              </p>
+              <p style={{ margin: 0, fontSize: '10px', color: '#9f8881' }}>Pro Workspace</p>
             </div>
           </div>
           <button
             onClick={handleSignOut}
-            className="w-full py-2 px-3 text-xs text-[#a89a95] hover:text-white bg-[#241815] hover:bg-[#3b2a26] rounded-lg transition-colors text-left flex items-center gap-2"
+            style={{
+              width: '100%',
+              padding: '9px 12px',
+              borderRadius: '10px',
+              backgroundColor: '#35201c',
+              color: '#d6c4be',
+              fontSize: '12px',
+              fontWeight: 500,
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
           >
             🚪 Sign Out
           </button>
         </div>
       </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 p-10 overflow-y-auto bg-[#f9f5f0] text-[#1c1412]">
-        <div className="flex justify-between items-center mb-8">
+      {/* Main Cream Content Container */}
+      <main
+        style={{
+          flex: 1,
+          margin: '16px 16px 16px 0',
+          borderRadius: '32px',
+          backgroundColor: '#fbf4eb',
+          color: '#261612',
+          padding: '40px 48px',
+          overflowY: 'auto',
+          boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+        }}
+      >
+        {/* Top Header */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: '36px',
+          }}
+        >
           <div>
-            <h2 className="text-3xl font-extrabold tracking-tight">Project Workspace</h2>
-            <p className="text-sm text-stone-500 mt-1">
+            <h2
+              style={{
+                fontSize: '32px',
+                fontWeight: 800,
+                letterSpacing: '-0.8px',
+                margin: 0,
+              }}
+            >
+              Project Workspace
+            </h2>
+            <p
+              style={{
+                fontSize: '13px',
+                color: '#8a7771',
+                margin: '6px 0 0 0',
+              }}
+            >
               Select a project to upload documents, or create an isolated workspace.
             </p>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <button
               onClick={() => setIsRoadmapOpen(true)}
-              className="px-4 py-2 border border-stone-300 rounded-xl text-sm font-semibold flex items-center gap-2 hover:bg-stone-100 transition-colors bg-white shadow-sm"
+              style={{
+                padding: '9px 16px',
+                borderRadius: '12px',
+                backgroundColor: '#ffffff',
+                border: '1px solid #e7ded6',
+                fontSize: '13px',
+                fontWeight: 600,
+                color: '#261612',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+              }}
             >
               📊 Roadmap ({roadmapProgress}% Done)
             </button>
-            <button className="px-4 py-2 bg-[#1c1412] hover:bg-black text-white rounded-xl text-sm font-semibold transition-colors shadow-sm">
+            <button
+              style={{
+                padding: '9px 18px',
+                borderRadius: '12px',
+                backgroundColor: '#261612',
+                border: 'none',
+                fontSize: '13px',
+                fontWeight: 600,
+                color: '#ffffff',
+                cursor: 'pointer',
+              }}
+            >
               + New Project
             </button>
           </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-3 gap-6 mb-10">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
-            <p className="text-xs font-bold uppercase tracking-wider text-stone-400">
+        {/* Stats Row */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '20px',
+            marginBottom: '40px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '24px',
+              padding: '24px 28px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+            }}
+          >
+            <p
+              style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                letterSpacing: '0.8px',
+                textTransform: 'uppercase',
+                color: '#6e5d57',
+                margin: 0,
+              }}
+            >
               Active Workspaces
             </p>
-            <p className="text-4xl font-extrabold mt-2">{workspaces.length}</p>
+            <p
+              style={{
+                fontSize: '44px',
+                fontWeight: 800,
+                margin: '12px 0 0 0',
+                lineHeight: 1,
+              }}
+            >
+              {workspaces.length}
+            </p>
           </div>
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
-            <p className="text-xs font-bold uppercase tracking-wider text-stone-400">
+
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '24px',
+              padding: '24px 28px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+            }}
+          >
+            <p
+              style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                letterSpacing: '0.8px',
+                textTransform: 'uppercase',
+                color: '#6e5d57',
+                margin: 0,
+              }}
+            >
               Requirements Indexed
             </p>
-            <p className="text-4xl font-extrabold mt-2">{totalRequirements}</p>
+            <p
+              style={{
+                fontSize: '44px',
+                fontWeight: 800,
+                margin: '12px 0 0 0',
+                lineHeight: 1,
+              }}
+            >
+              {totalRequirements}
+            </p>
           </div>
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
-            <p className="text-xs font-bold uppercase tracking-wider text-stone-400">
+
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '24px',
+              padding: '24px 28px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+            }}
+          >
+            <p
+              style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                letterSpacing: '0.8px',
+                textTransform: 'uppercase',
+                color: '#6e5d57',
+                margin: 0,
+              }}
+            >
               Synthesized Tests
             </p>
-            <p className="text-4xl font-extrabold mt-2">{totalTests}</p>
+            <p
+              style={{
+                fontSize: '44px',
+                fontWeight: 800,
+                margin: '12px 0 0 0',
+                lineHeight: 1,
+              }}
+            >
+              {totalTests}
+            </p>
           </div>
         </div>
 
-        {/* Project List */}
+        {/* Project Section */}
         <div>
-          <h3 className="text-lg font-bold mb-4">Your Projects</h3>
+          <h3 style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 16px 0' }}>
+            Your Projects
+          </h3>
 
           {loading ? (
-            <p className="text-sm text-stone-400 py-6">Loading workspaces...</p>
+            <p style={{ fontSize: '13px', color: '#8a7771' }}>Loading workspaces...</p>
           ) : workspaces.length === 0 ? (
-            <div className="bg-white p-8 rounded-2xl border border-dashed border-stone-300 text-center">
-              <p className="text-stone-500 font-medium">No projects created yet.</p>
-              <p className="text-stone-400 text-xs mt-1">
+            <div
+              style={{
+                backgroundColor: '#ffffff',
+                borderRadius: '24px',
+                padding: '40px',
+                border: '1px dashed #d8cbc4',
+                textAlign: 'center',
+              }}
+            >
+              <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#6e5d57' }}>
+                No projects created yet.
+              </p>
+              <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#9f8881' }}>
                 Click "+ New Project" above to create your first workspace.
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-6">
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
+                gap: '20px',
+              }}
+            >
               {workspaces.map((ws) => (
                 <div
                   key={ws.id}
-                  className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex flex-col justify-between space-y-4"
+                  style={{
+                    backgroundColor: '#ffffff',
+                    borderRadius: '24px',
+                    padding: '24px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    minHeight: '180px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                  }}
                 >
                   <div>
-                    <h4 className="text-lg font-bold">{ws.name}</h4>
-                    <p className="text-xs text-stone-500 mt-1 line-clamp-2">
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                      }}
+                    >
+                      <h4 style={{ fontSize: '17px', fontWeight: 700, margin: 0 }}>
+                        {ws.name}
+                      </h4>
+                      <div style={{ display: 'flex', gap: '8px', color: '#ab958e', cursor: 'pointer' }}>
+                        <span>✎</span>
+                        <span>✕</span>
+                      </div>
+                    </div>
+                    <p
+                      style={{
+                        fontSize: '13px',
+                        color: '#6e5d57',
+                        margin: '10px 0 0 0',
+                        lineHeight: 1.4,
+                      }}
+                    >
                       {ws.description || 'Workspace for software requirement specifications.'}
                     </p>
-                    <p className="text-[10px] text-stone-400 font-mono mt-2">ID: {ws.id}</p>
+                    <p
+                      style={{
+                        fontSize: '11px',
+                        color: '#a3938c',
+                        fontFamily: 'monospace',
+                        margin: '14px 0 0 0',
+                      }}
+                    >
+                      ID: {ws.id}
+                    </p>
                   </div>
 
-                  <div className="flex items-center justify-between pt-4 border-t border-stone-100 text-xs font-semibold">
-                    <span className="text-stone-500">
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      borderTop: '1px solid #f2ece6',
+                      paddingTop: '16px',
+                      marginTop: '16px',
+                      fontSize: '12px',
+                    }}
+                  >
+                    <span style={{ color: '#8a7771', fontWeight: 500 }}>
                       {ws.requirements_count || 0} Requirements • {ws.tests_count || 0} Tests
                     </span>
-                    <div className="space-x-3">
-                      <button className="text-stone-700 hover:text-black">Specs →</button>
-                      <button className="text-stone-900 font-bold hover:underline">
+                    <div style={{ display: 'flex', gap: '14px' }}>
+                      <button
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#261612',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          padding: 0,
+                          fontSize: '12px',
+                        }}
+                      >
+                        Specs →
+                      </button>
+                      <button
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#261612',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          padding: 0,
+                          fontSize: '12px',
+                        }}
+                      >
                         Tests & Scripts →
                       </button>
                     </div>
