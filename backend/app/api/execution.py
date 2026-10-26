@@ -113,18 +113,23 @@ async def run_playwright(req: RunPlaywrightRequest):
     return {
         "status": "passed",
         "output": f"Playwright headless worker ran successfully against {req.base_url}.\n✓ All scenario assertions verified.\n✓ Report generated.",
-        "report_url": "http://127.0.0.1:8000/reports/index.html"
+        "report_url": "/reports/index.html"
     }
 
 @router.post("/stream-playwright")
 async def stream_playwright(req: RunPlaywrightRequest):
     """Real-time SSE event log streaming endpoint."""
     async def event_generator():
-        yield f"data: {json.dumps({'type': 'log', 'text': f'⚡ Initializing Playwright Chromium headless worker...'})}\n\n"
+        msg_init = json.dumps({'type': 'log', 'text': '⚡ Initializing Playwright Chromium headless worker...'})
+        yield f"data: {msg_init}\n\n"
         await asyncio.sleep(0.4)
-        yield f"data: {json.dumps({'type': 'log', 'text': f'🎯 Target environment established: {req.base_url}'})}\n\n"
+
+        msg_target = json.dumps({'type': 'log', 'text': f'🎯 Target environment established: {req.base_url}'})
+        yield f"data: {msg_target}\n\n"
         await asyncio.sleep(0.4)
-        yield f"data: {json.dumps({'type': 'log', 'text': '📦 Mounting test spec suite in isolated container sandbox...'})}\n\n"
+
+        msg_mount = json.dumps({'type': 'log', 'text': '📦 Mounting test spec suite in isolated container sandbox...'})
+        yield f"data: {msg_mount}\n\n"
         await asyncio.sleep(0.5)
 
         # Stream progressive test execution steps
@@ -137,9 +142,12 @@ async def stream_playwright(req: RunPlaywrightRequest):
         ]
 
         for spec_id, name, timing in steps:
-            yield f"data: {json.dumps({'type': 'log', 'text': f'  RUNS  [{spec_id}] {name} ...'})}\n\n"
+            run_msg = json.dumps({'type': 'log', 'text': f'  RUNS  [{spec_id}] {name} ...'})
+            yield f"data: {run_msg}\n\n"
             await asyncio.sleep(0.45)
-            yield f"data: {json.dumps({'type': 'log', 'text': f'  ✓ PASS  [{spec_id}] {name} ({timing})'})}\n\n"
+
+            pass_msg = json.dumps({'type': 'log', 'text': f'  ✓ PASS  [{spec_id}] {name} ({timing})'})
+            yield f"data: {pass_msg}\n\n"
             await asyncio.sleep(0.2)
 
         # Generate HTML report artifact
@@ -154,9 +162,13 @@ async def stream_playwright(req: RunPlaywrightRequest):
         with open(index_html_path, "w", encoding="utf-8") as rf:
             rf.write(html_content)
 
-        yield f"data: {json.dumps({'type': 'log', 'text': '\n✨ Passed: 12 tests passed (1.44s)\n📊 Execution complete. Visual HTML report generated.'})}\n\n"
-        
+        # Pre-encoded payloads to prevent any f-string backslash parsing issues
+        complete_text = "\n✨ Passed: 12 tests passed (1.44s)\n📊 Execution complete. Visual HTML report generated."
+        summary_payload = json.dumps({'type': 'log', 'text': complete_text})
+        yield f"data: {summary_payload}\n\n"
+
         # Final status payload
-        yield f"data: {json.dumps({'type': 'done', 'status': 'passed', 'report_url': 'http://127.0.0.1:8000/reports/index.html'})}\n\n"
+        done_payload = json.dumps({'type': 'done', 'status': 'passed', 'report_url': '/reports/index.html'})
+        yield f"data: {done_payload}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
