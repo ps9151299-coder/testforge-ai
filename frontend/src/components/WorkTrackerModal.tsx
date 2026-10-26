@@ -1,368 +1,113 @@
-import React, { useState } from 'react';
+import React from 'react';
 
-interface MilestoneItem {
+export interface Task {
   id: string;
   title: string;
-  category: 'Part 1: Completed Work' | 'Part 2: What Is Left to Build';
-  status: 'done' | 'pending';
-  desc: string;
-  badge: string;
+  completed: boolean;
 }
 
-const MILESTONES: MilestoneItem[] = [
-  // --- PART 1: COMPLETED WORK ---
-  {
-    id: 'auth-session',
-    title: '1. Authentication & Session Architecture',
-    category: 'Part 1: Completed Work',
-    status: 'done',
-    desc: 'Local session tracking in localStorage ("current_user"), persistent profile badge in lower sidebar with user initials & "Pro Workspace" tier, safe sign-out routing to /login.',
-    badge: 'Completed'
-  },
-  {
-    id: 'dashboard-sync',
-    title: '2. Dashboard & Workspace Orchestration',
-    category: 'Part 1: Completed Work',
-    status: 'done',
-    desc: 'Dynamic real-time counters (Workspaces, Requirements, Synthesized Tests), two-way reconciliation hooks preventing reset to 0, split-routing (Specs → and Tests & Scripts →), and non-blocking toast alerts.',
-    badge: 'Completed'
-  },
-  {
-    id: 'req-pipeline',
-    title: '3. Requirement Ingestion Pipeline',
-    category: 'Part 1: Completed Work',
-    status: 'done',
-    desc: 'Multi-format ingestion (.pdf, .docx, .txt), documentService & generateService backend extraction, and structured Parsed Specs matrix (Req ID, Type, Actor, Behavior, Status).',
-    badge: 'Completed'
-  },
-  {
-    id: 'strategy-synthesis',
-    title: '4. AI Test Strategy & Case Synthesis',
-    category: 'Part 1: Completed Work',
-    status: 'done',
-    desc: '5-part test strategy (Objective/Scope, Levels, Entry/Exit criteria, Risks), test scenario matrix (Positive, Negative, Edge, Security), and full TypeScript @playwright/test generation.',
-    badge: 'Completed'
-  },
-  {
-    id: 'persistent-state',
-    title: '5. Persistent State & Artifact Storage',
-    category: 'Part 1: Completed Work',
-    status: 'done',
-    desc: 'Cache-first lazy initialization via localStorage keys (strategy, tests, script), and useEffect lifecycle safeguards to prevent unnecessary AI re-synthesis on navigation.',
-    badge: 'Completed'
-  },
-  {
-    id: 'export-runner',
-    title: '6. Export Pipeline & Live Automation Runner',
-    category: 'Part 1: Completed Work',
-    status: 'done',
-    desc: '.spec.ts download, CSV test matrix export for Jira/Zephyr, target environment URL setting, headless subprocess execution (POST /api/v1/execute/run-playwright), and embedded ANSI terminal.',
-    badge: 'Completed'
-  },
+export interface WorkspaceItem {
+  id: string;
+  name: string;
+  description?: string;
+  requirements_count?: number;
+  tests_count?: number;
+  completed_tasks?: number;
+  total_tasks?: number;
+}
 
-  // --- PART 2: WHAT IS LEFT TO BUILD ---
-  {
-    id: 'db-transition',
-    title: '1. Database Transition (SQLite / PostgreSQL)',
-    category: 'Part 2: What Is Left to Build',
-    status: 'pending',
-    desc: 'Migrate workspaces, requirement records, and test artifacts out of localStorage into persistent relational tables using SQLAlchemy or SQLModel.',
-    badge: 'High Priority'
-  },
-  {
-    id: 'backend-jwt',
-    title: '2. Backend User Authentication (JWT)',
-    category: 'Part 2: What Is Left to Build',
-    status: 'pending',
-    desc: 'Replace localStorage keys with authenticated FastAPI endpoints (/api/v1/auth/login and /register) backed by hashed database credentials.',
-    badge: 'High Priority'
-  },
-  {
-    id: 'heuristic-filtering',
-    title: '3. Academic & Cover Page Filtering',
-    category: 'Part 2: What Is Left to Build',
-    status: 'pending',
-    desc: 'Implement extraction prompts and regex filters to eliminate non-functional academic boilerplates (faculty names, university headers, certificates).',
-    badge: 'Pending'
-  },
-  {
-    id: 'token-chunking',
-    title: '4. Chunking for Large PRDs (30+ Pages)',
-    category: 'Part 2: What Is Left to Build',
-    status: 'pending',
-    desc: 'Implement token-aware sliding window chunking to prevent context overflow errors during LLM document extraction.',
-    badge: 'Pending'
-  },
-  {
-    id: 'visual-html-report',
-    title: '5. Visual HTML Test Reports & Traces',
-    category: 'Part 2: What Is Left to Build',
-    status: 'pending',
-    desc: 'Integrate native Playwright HTML reporter output (playwright-report/index.html) into the frontend to inspect visual traces, steps, and execution timings.',
-    badge: 'Pending'
-  },
-  {
-    id: 'screenshot-artifacts',
-    title: '6. Screenshot & Failure Artifact Capture',
-    category: 'Part 2: What Is Left to Build',
-    status: 'pending',
-    desc: 'Configure Playwright test runner to capture screenshots on assertion failures and expose them in the browser runner interface.',
-    badge: 'Pending'
-  },
-  {
-    id: 'sse-streaming',
-    title: '7. WebSocket / SSE Terminal Streaming',
-    category: 'Part 2: What Is Left to Build',
-    status: 'pending',
-    desc: 'Replace batch HTTP response polling with real-time streaming of stdout/stderr logs into the terminal line-by-line.',
-    badge: 'Pending'
-  },
-  {
-    id: 'workspace-mutation',
-    title: '8. Workspace Mutation Actions & Req Editing',
-    category: 'Part 2: What Is Left to Build',
-    status: 'pending',
-    desc: 'Add 3-dot dropdown menus to rename or delete workspaces (cascading cleanup) and enable inline editing/deletion of parsed requirement rows.',
-    badge: 'Pending'
-  }
-];
+export interface WorkTrackerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  progress?: number;
+  workspaces?: WorkspaceItem[];
+  tasks?: Task[];
+}
 
-export const WorkTrackerModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState<'all' | 'done' | 'pending'>('all');
-
+export const WorkTrackerModal: React.FC<WorkTrackerModalProps> = ({
+  isOpen,
+  onClose,
+  progress = 0,
+  workspaces = [],
+  tasks = [],
+}) => {
   if (!isOpen) return null;
 
-  const doneCount = MILESTONES.filter(m => m.status === 'done').length;
-  const totalCount = MILESTONES.length;
-  const progressPercent = Math.round((doneCount / totalCount) * 100);
-
-  const displayedList = MILESTONES.filter(item => {
-    if (activeTab === 'done') return item.status === 'done';
-    if (activeTab === 'pending') return item.status === 'pending';
-    return true;
-  });
+  // Strict check: if no projects and no tasks exist, progress must be 0%
+  const effectiveProgress =
+    workspaces.length === 0 && tasks.length === 0
+      ? 0
+      : Math.min(Math.max(progress, 0), 100);
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(52, 38, 23, 0.55)',
-      backdropFilter: 'blur(3px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 10000,
-      padding: '20px'
-    }}>
-      <div style={{
-        backgroundColor: '#FDFBF7',
-        border: '1px solid #EDE4D3',
-        borderRadius: '16px',
-        width: '100%',
-        maxWidth: '860px',
-        maxHeight: '88vh',
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 20px 40px rgba(52, 38, 23, 0.2)',
-        overflow: 'hidden'
-      }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-[#241815] text-[#f5ede4] w-full max-w-xl rounded-2xl p-6 shadow-2xl border border-[#3b2a26]">
         {/* Header */}
-        <div style={{
-          padding: '16px 24px',
-          borderBottom: '1px solid #EDE4D3',
-          backgroundColor: '#F7F3EB',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
+        <div className="flex justify-between items-center pb-4 border-b border-[#3b2a26]">
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                backgroundColor: '#DECDB6',
-                color: '#513D26',
-                padding: '2px 8px',
-                borderRadius: '12px'
-              }}>
-                ROADMAP AUDIT
-              </span>
-              <span style={{ fontSize: '12px', color: '#8C6C47', fontWeight: 600 }}>
-                TestForge AI Implementation Tracker
-              </span>
-            </div>
-            <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#342617', margin: '4px 0 0 0' }}>
-              Completed Work vs. Backlog
-            </h2>
+            <h3 className="text-xl font-bold tracking-tight">Work Roadmap Tracker</h3>
+            <p className="text-xs text-[#a89a95] mt-0.5">
+              Track project milestones, test synthesis, and requirements.
+            </p>
           </div>
-          <button 
+          <button
             onClick={onClose}
-            style={{
-              background: '#EDE4D3',
-              border: 'none',
-              cursor: 'pointer',
-              color: '#513D26',
-              fontWeight: 'bold',
-              width: '32px',
-              height: '32px',
-              borderRadius: '8px',
-              fontSize: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-[#a89a95] hover:text-white hover:bg-[#3b2a26] transition-colors"
           >
             ✕
           </button>
         </div>
 
-        {/* Stats Row */}
-        <div style={{
-          padding: '16px 24px',
-          backgroundColor: '#FAF6EF',
-          borderBottom: '1px solid #EDE4D3',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: '12px'
-        }}>
-          <div style={{ padding: '12px 16px', background: '#FFFFFF', border: '1px solid #EDE4D3', borderRadius: '10px' }}>
-            <span style={{ fontSize: '11px', color: '#8C6C47', fontWeight: 700, letterSpacing: '0.5px' }}>OVERALL COMPLETION</span>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '4px' }}>
-              <span style={{ fontSize: '28px', fontWeight: 800, color: '#513D26' }}>{progressPercent}%</span>
-              <span style={{ fontSize: '12px', color: '#8C6C47' }}>({doneCount} of {totalCount} items)</span>
-            </div>
-            <div style={{ width: '100%', height: '6px', background: '#EDE4D3', borderRadius: '4px', marginTop: '8px', overflow: 'hidden' }}>
-              <div style={{ width: `${progressPercent}%`, height: '100%', background: '#8C6C47', borderRadius: '4px' }} />
-            </div>
+        {/* Progress Bar Container */}
+        <div className="my-6 p-4 rounded-xl bg-[#1c1412] border border-[#3b2a26]">
+          <div className="flex justify-between items-center text-sm font-semibold mb-2">
+            <span>Overall Roadmap Completion</span>
+            <span className="text-amber-400 font-mono text-base">{effectiveProgress}%</span>
           </div>
-
-          <div style={{ padding: '12px 16px', background: '#FFFFFF', border: '1px solid #EDE4D3', borderRadius: '10px' }}>
-            <div style={{ color: '#2E7D32', fontSize: '12px', fontWeight: 700 }}>✓ Part 1: Work Done</div>
-            <div style={{ fontSize: '20px', fontWeight: 800, color: '#342617', marginTop: '4px' }}>6 Modules Built</div>
-            <div style={{ fontSize: '11px', color: '#8C6C47', marginTop: '2px' }}>Auth, Dashboard, Ingestion, Strategy, Storage, Runner</div>
-          </div>
-
-          <div style={{ padding: '12px 16px', background: '#FFFFFF', border: '1px solid #EDE4D3', borderRadius: '10px' }}>
-            <div style={{ color: '#B45309', fontSize: '12px', fontWeight: 700 }}>⏳ Part 2: Backlog</div>
-            <div style={{ fontSize: '20px', fontWeight: 800, color: '#342617', marginTop: '4px' }}>8 Tasks Remaining</div>
-            <div style={{ fontSize: '11px', color: '#8C6C47', marginTop: '2px' }}>SQL DB, JWT, Reports, Chunking, SSE, Actions</div>
+          <div className="w-full h-3 bg-[#2d1e1a] rounded-full overflow-hidden">
+            <div
+              className="h-full bg-amber-500 rounded-full transition-all duration-500"
+              style={{ width: `${effectiveProgress}%` }}
+            />
           </div>
         </div>
 
-        {/* Tab Filter Buttons */}
-        <div style={{ padding: '10px 24px', borderBottom: '1px solid #EDE4D3', display: 'flex', gap: '8px', background: '#FDFBF7' }}>
-          {(['all', 'done', 'pending'] as const).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              style={{
-                padding: '6px 14px',
-                fontSize: '12px',
-                fontWeight: 600,
-                borderRadius: '6px',
-                cursor: 'pointer',
-                border: '1px solid',
-                backgroundColor: activeTab === tab ? '#8C6C47' : '#F7F3EB',
-                color: activeTab === tab ? '#FFFFFF' : '#6E5334',
-                borderColor: activeTab === tab ? '#8C6C47' : '#EDE4D3'
-              }}
-            >
-              {tab === 'all' ? `All (${totalCount})` : tab === 'done' ? `Part 1 Done (${doneCount})` : `Part 2 Backlog (${totalCount - doneCount})`}
-            </button>
-          ))}
-        </div>
-
-        {/* List of Deliverables */}
-        <div style={{ padding: '16px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {displayedList.map(item => {
-            const isDone = item.status === 'done';
-            return (
+        {/* Workspaces & Tasks List */}
+        <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+          {workspaces.length === 0 && tasks.length === 0 ? (
+            <div className="text-center py-8 px-4 rounded-xl bg-[#1c1412] border border-dashed border-[#3b2a26]">
+              <p className="text-sm text-[#a89a95]">
+                No projects or roadmaps started yet.
+              </p>
+              <p className="text-xs text-[#a89a95]/70 mt-1">
+                Create a project workspace to begin generating requirements and tests.
+              </p>
+            </div>
+          ) : (
+            workspaces.map((ws) => (
               <div
-                key={item.id}
-                style={{
-                  padding: '12px 16px',
-                  borderRadius: '10px',
-                  backgroundColor: isDone ? '#FAF7F2' : '#FFFFFF',
-                  border: `1px solid ${isDone ? '#EDE4D3' : '#F0E2C8'}`,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  gap: '14px'
-                }}
+                key={ws.id}
+                className="p-3.5 rounded-xl bg-[#1c1412] border border-[#3b2a26] flex items-center justify-between"
               >
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                  <div style={{
-                    marginTop: '2px',
-                    width: '20px',
-                    height: '20px',
-                    borderRadius: '50%',
-                    backgroundColor: isDone ? '#DCFCE7' : '#FEF3C7',
-                    color: isDone ? '#166534' : '#B45309',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
-                    flexShrink: 0
-                  }}>
-                    {isDone ? '✓' : '•'}
-                  </div>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '14px', fontWeight: 700, color: '#342617' }}>{item.title}</span>
-                      <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', background: '#EDE4D3', color: '#6E5334' }}>
-                        {item.category}
-                      </span>
-                    </div>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#6E5334', lineHeight: '1.45' }}>
-                      {item.desc}
-                    </p>
-                  </div>
+                <div>
+                  <h4 className="font-semibold text-sm text-[#f5ede4]">{ws.name}</h4>
+                  <p className="text-xs text-[#a89a95] mt-0.5">
+                    {ws.requirements_count ?? 0} Requirements • {ws.tests_count ?? 0} Tests
+                  </p>
                 </div>
-
-                <span style={{
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  padding: '3px 10px',
-                  borderRadius: '999px',
-                  whiteSpace: 'nowrap',
-                  backgroundColor: isDone ? '#E8F5E9' : '#FEF3C7',
-                  color: isDone ? '#2E7D32' : '#92400E',
-                  border: `1px solid ${isDone ? '#C8E6C9' : '#FDE68A'}`
-                }}>
-                  {item.badge}
+                <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-amber-900/40 text-amber-300 border border-amber-700/50">
+                  Active
                 </span>
               </div>
-            );
-          })}
+            ))
+          )}
         </div>
 
         {/* Footer */}
-        <div style={{
-          padding: '12px 24px',
-          borderTop: '1px solid #EDE4D3',
-          backgroundColor: '#F7F3EB',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <span style={{ fontSize: '12px', color: '#8C6C47' }}>TestForge AI Platform Specifications</span>
+        <div className="mt-6 pt-4 border-t border-[#3b2a26] flex justify-end">
           <button
             onClick={onClose}
-            className="btn-sand-primary"
-            style={{
-              padding: '6px 18px',
-              backgroundColor: '#8C6C47',
-              color: '#FFFFFF',
-              border: 'none',
-              borderRadius: '8px',
-              fontWeight: 600,
-              fontSize: '13px',
-              cursor: 'pointer'
-            }}
+            className="px-4 py-2 bg-[#3b2a26] hover:bg-[#4d3732] text-[#f5ede4] text-sm font-medium rounded-lg transition-colors"
           >
             Close
           </button>
@@ -371,3 +116,5 @@ export const WorkTrackerModal: React.FC<{ isOpen: boolean; onClose: () => void }
     </div>
   );
 };
+
+export default WorkTrackerModal;
