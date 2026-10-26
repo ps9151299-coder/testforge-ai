@@ -44,11 +44,10 @@ export const Dashboard: React.FC = () => {
 
       const serverWorkspaces = Array.isArray(res.data) ? res.data : [];
 
-      // Combine server workspaces with any locally created workspaces for demo resilience
+      // Combine server workspaces with local storage fallback
       const localSavedRaw = localStorage.getItem(`local_workspaces_${userEmail}`);
       const localWorkspaces: WorkspaceItem[] = localSavedRaw ? JSON.parse(localSavedRaw) : [];
 
-      // Merge unique by ID
       const map = new Map<string, WorkspaceItem>();
       [...serverWorkspaces, ...localWorkspaces].forEach((w) => map.set(w.id, w));
       setWorkspaces(Array.from(map.values()));
@@ -88,7 +87,6 @@ export const Dashboard: React.FC = () => {
       const token = localStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-      // Attempt standard FastAPI workspace creation
       await apiClient.post(
         '/api/v1/workspaces/',
         {
@@ -100,15 +98,13 @@ export const Dashboard: React.FC = () => {
         { headers, timeout: 6000 }
       );
     } catch (error) {
-      console.warn('API call encountered an issue. Using instant local persistence for demo:', error);
+      console.warn('Backend API unavailable. Saving to local storage for demo persistence:', error);
     } finally {
-      // Save locally so the demo NEVER fails on screen
       const currentLocalRaw = localStorage.getItem(`local_workspaces_${userEmail}`);
       const currentLocal: WorkspaceItem[] = currentLocalRaw ? JSON.parse(currentLocalRaw) : [];
       const updatedList = [newWs, ...currentLocal.filter((w) => w.id !== newWs.id)];
       localStorage.setItem(`local_workspaces_${userEmail}`, JSON.stringify(updatedList));
 
-      // Update UI state immediately
       setWorkspaces((prev) => [newWs, ...prev.filter((w) => w.id !== newWs.id)]);
       setNewProjectName('');
       setNewProjectDesc('');
@@ -133,6 +129,23 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  // Helper for opening requirement file upload for the latest project
+  const handleOpenRequirements = () => {
+    if (workspaces.length > 0) {
+      navigate(`/projects/${workspaces[0].id}`);
+    } else {
+      alert('Please create a project first to upload requirements.');
+    }
+  };
+
+  const handleOpenTestGenerator = () => {
+    if (workspaces.length > 0) {
+      navigate(`/projects/${workspaces[0].id}/generate`);
+    } else {
+      alert('Please create a project first to access test generation.');
+    }
+  };
+
   // Aggregate metrics
   const totalRequirements = useMemo(
     () => workspaces.reduce((sum, w) => sum + (w.requirements_count || 0), 0),
@@ -144,7 +157,7 @@ export const Dashboard: React.FC = () => {
     [workspaces]
   );
 
-  // Accurate roadmap percentage
+  // Accurate roadmap percentage calculation
   const roadmapProgress = useMemo(() => {
     if (!workspaces || workspaces.length === 0) {
       return 0;
@@ -227,6 +240,7 @@ export const Dashboard: React.FC = () => {
           {/* Navigation Links */}
           <nav style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <button
+              onClick={() => navigate('/dashboard')}
               style={{
                 width: '100%',
                 textAlign: 'left',
@@ -246,6 +260,7 @@ export const Dashboard: React.FC = () => {
               📁 Projects
             </button>
             <button
+              onClick={handleOpenRequirements}
               style={{
                 width: '100%',
                 textAlign: 'left',
@@ -265,6 +280,7 @@ export const Dashboard: React.FC = () => {
               📄 Requirements
             </button>
             <button
+              onClick={handleOpenTestGenerator}
               style={{
                 width: '100%',
                 textAlign: 'left',
@@ -363,7 +379,7 @@ export const Dashboard: React.FC = () => {
         </div>
       </aside>
 
-      {/* Main Cream Content Area */}
+      {/* Main Cream Content Container */}
       <main
         style={{
           flex: 1,
@@ -588,6 +604,7 @@ export const Dashboard: React.FC = () => {
               {workspaces.map((ws) => (
                 <div
                   key={ws.id}
+                  onClick={() => navigate(`/projects/${ws.id}`)}
                   style={{
                     backgroundColor: '#ffffff',
                     borderRadius: '24px',
@@ -597,6 +614,8 @@ export const Dashboard: React.FC = () => {
                     justifyContent: 'space-between',
                     minHeight: '180px',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                    cursor: 'pointer',
+                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
                   }}
                 >
                   <div>
@@ -610,11 +629,11 @@ export const Dashboard: React.FC = () => {
                       <h4 style={{ fontSize: '17px', fontWeight: 700, margin: 0 }}>
                         {ws.name}
                       </h4>
-                      <div style={{ display: 'flex', gap: '8px', color: '#ab958e', cursor: 'pointer' }}>
+                      <div style={{ display: 'flex', gap: '8px', color: '#ab958e' }}>
                         <span
                           title="Delete Workspace"
                           onClick={(e) => handleDeleteWorkspace(ws.id, e)}
-                          style={{ fontSize: '14px', hover: { color: '#ff4d4f' } } as any}
+                          style={{ fontSize: '14px', cursor: 'pointer', padding: '2px 4px' }}
                         >
                           ✕
                         </span>
@@ -658,7 +677,10 @@ export const Dashboard: React.FC = () => {
                     </span>
                     <div style={{ display: 'flex', gap: '14px' }}>
                       <button
-                        onClick={() => navigate(`/project/${ws.id}`)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/projects/${ws.id}`);
+                        }}
                         style={{
                           background: 'none',
                           border: 'none',
@@ -672,7 +694,10 @@ export const Dashboard: React.FC = () => {
                         Specs →
                       </button>
                       <button
-                        onClick={() => navigate(`/project/${ws.id}`)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/projects/${ws.id}/generate`);
+                        }}
                         style={{
                           background: 'none',
                           border: 'none',
@@ -761,7 +786,7 @@ export const Dashboard: React.FC = () => {
                   <input
                     type="text"
                     required
-                    placeholder="e.g., Banking App Automation"
+                    placeholder="e.g., E-commerce Platform"
                     value={newProjectName}
                     onChange={(e) => setNewProjectName(e.target.value)}
                     style={{
