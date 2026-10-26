@@ -1,0 +1,341 @@
+/* src/App.css */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body, html, #root {
+  width: 100%;
+  min-height: 100vh;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background-color: #30170f; /* Deep chocolate brown background */
+}
+
+/* Outer centering frame */
+.login-screen {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background-color: #30170f;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Star/Sparkle Accent in Bottom Right */
+.screen-sparkle {
+  position: absolute;
+  bottom: 40px;
+  right: 50px;
+  width: 32px;
+  height: 32px;
+  background: radial-gradient(circle, #b88d75 0%, transparent 70%);
+  opacity: 0.6;
+}
+
+/* Main rounded card container */
+.auth-card {
+  width: 100%;
+  max-width: 980px;
+  min-height: 560px;
+  display: flex;
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45);
+}
+
+/* Left Hero Banner */
+.hero-section {
+  flex: 1.05;
+  background: linear-gradient(135deg, #422015 0%, #2b140d 100%);
+  position: relative;
+  padding: 60px 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  color: #faeedf;
+}
+
+/* 3D Bubble / Curved overlay shapes */
+.bubble-shape {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.bubble-bg-curve {
+  width: 480px;
+  height: 480px;
+  top: -120px;
+  right: -140px;
+  background: #23100a;
+  border-radius: 50%;
+  border: 12px solid #5a3021;
+  opacity: 0.85;
+}
+
+.bubble-large {
+  width: 220px;
+  height: 220px;
+  bottom: 40px;
+  right: 80px;
+  background: radial-gradient(circle at 35% 30%, #87543f 0%, #462215 55%, #1f0b06 100%);
+  box-shadow: inset -6px -6px 16px rgba(0,0,0,0.6), 12px 18px 28px rgba(0,0,0,0.5);
+}
+
+.bubble-small {
+  width: 170px;
+  height: 170px;
+  bottom: -20px;
+  left: -30px;
+  background: radial-gradient(circle at 35% 30%, #7d4d3a 0%, #3e1e13 60%, #1a0804 100%);
+  box-shadow: inset -4px -4px 12px rgba(0,0,0,0.6), 8px 14px 22px rgba(0,0,0,0.4);
+}
+
+.hero-content {
+  position: relative;
+  z-index: 2;
+  max-width: 380px;
+}
+
+.hero-welcome {
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+  color: #fff6ed;
+}
+
+.hero-headline {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #dfbf9f;
+  margin-bottom: 20px;
+}
+
+.hero-description {
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: #ceb5a3;
+  opacity: 0.9;
+}
+
+/* Right Form Section */
+.form-section {
+  flex: 0.95;
+  background-color: #f7ede1; /* Warm cream */
+  padding: 56px 54px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Corner Sphere on Right Side */
+.bubble-corner {
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  bottom: -50px;
+  right: -50px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #e2cbbb 0%, #bca18e 60%, #8c7363 100%);
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.form-header {
+  margin-bottom: 24px;
+}
+
+.form-title {
+  font-size: 32px;
+  font-weight: 800;
+  color: #2b140d;
+  margin-bottom: 6px;
+}
+
+.form-subtitle {
+  font-size: 12px;
+  color: #8c6a56;
+}
+
+.form-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+  z-index: 1;
+}
+
+.input-container {
+  display: flex;
+  align-items: center;
+  background-color: #dfcdbf; /* Warm taupe input fill */
+  border-radius: 10px;
+  padding: 13px 16px;
+  gap: 12px;
+  transition: all 0.2s ease;
+}
+
+.input-container:focus-within {
+  background-color: #d6bfaf;
+  outline: 2px solid #5a3021;
+}
+
+.input-icon {
+  width: 18px;
+  height: 18px;
+  color: #5a3a29;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.form-field {
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 100%;
+  font-size: 13.5px;
+  color: #2b140d;
+  font-family: inherit;
+}
+
+.form-field::placeholder {
+  color: #7b5d49;
+}
+
+.toggle-show {
+  border: none;
+  background: none;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #4b271b;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.form-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #5a3a29;
+  margin: 2px 0 6px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+
+.checkbox-input {
+  accent-color: #2b140d;
+  width: 14px;
+  height: 14px;
+}
+
+.forgot-link {
+  color: #5a3a29;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.forgot-link:hover {
+  text-decoration: underline;
+}
+
+.btn-signin {
+  width: 100%;
+  padding: 13px;
+  background-color: #240f08;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-signin:hover {
+  background-color: #3b1c11;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 6px 0;
+  color: #8c6a56;
+  font-size: 11px;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #d8c2b1;
+}
+
+.divider span {
+  padding: 0 10px;
+}
+
+.btn-secondary {
+  width: 100%;
+  padding: 12px;
+  background-color: transparent;
+  color: #240f08;
+  border: 1.5px solid #240f08;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-secondary:hover {
+  background-color: rgba(36, 15, 8, 0.05);
+}
+
+.form-footer {
+  text-align: center;
+  font-size: 11.5px;
+  color: #7b5d49;
+  margin-top: 14px;
+}
+
+.signup-link {
+  color: #240f08;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.signup-link:hover {
+  text-decoration: underline;
+}
+
+/* Responsiveness */
+@media (max-width: 820px) {
+  .hero-section {
+    display: none;
+  }
+  .auth-card {
+    max-width: 440px;
+  }
+}

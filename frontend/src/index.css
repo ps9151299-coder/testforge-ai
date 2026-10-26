@@ -1,0 +1,45 @@
+/* --- Light Brown / Sand Theme Variables --- */
+:root {
+  --sand-bg: #FDFBF7;
+  --sand-panel: #F7F3EB;
+  --sand-card: #FFFFFF;
+  --sand-border: #EDE4D3;
+  --sand-border-strong: #DECDB6;
+  --sand-text-main: #342617;
+  --sand-text-muted: #6E5334;
+  --sand-text-subtle: #8C6C47;
+  --sand-primary: #8C6C47;
+  --sand-primary-hover: #755734;
+  --sand-accent-badge: #EFE6D5;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--sand-bg);
+  color: var(--sand-text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Light brown utility classes you can reuse anywhere in your JSX */
+.bg-sand-page { background-color: var(--sand-bg); }
+.bg-sand-panel { background-color: var(--sand-panel); }
+.bg-sand-card { background-color: var(--sand-card); }
+.border-sand { border: 1px solid var(--sand-border); }
+.border-sand-strong { border: 1px solid var(--sand-border-strong); }
+.text-sand-dark { color: var(--sand-text-main); }
+.text-sand-muted { color: var(--sand-text-muted); }
+.btn-sand-primary {
+  background-color: var(--sand-primary);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.15s ease;
+}
+.btn-sand-primary:hover {
+  background-color: var(--sand-primary-hover);
+}

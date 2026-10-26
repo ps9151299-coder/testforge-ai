@@ -1,0 +1,13 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+node_modules/
+frontend/node_modules/
+frontend/dist/
+testforge.db
+users_db.json
+.env
+.env.local
+playwright-report/
+test-results/
