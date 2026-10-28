@@ -4,6 +4,7 @@ import RegisterPage from './pages/Register';
 import DashboardPage from './pages/Dashboard';
 import ProjectDetailPage from './pages/ProjectDetail';
 import TestGeneratorPage from './pages/TestGenerator';
+import PlaywrightReportPage from './pages/PlaywrightReport';
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="/projects/:projectId/generate" element={<TestGeneratorPage />} />
+        <Route path="/reports" element={<PlaywrightReportPage />} />
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

@@ -18,7 +18,7 @@ export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [workspaces, setWorkspaces] = useState<WorkspaceItem[]>([]);
   const [isRoadmapOpen, setIsRoadmapOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // New Project Modal State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -26,36 +26,42 @@ export const Dashboard: React.FC = () => {
   const [newProjectDesc, setNewProjectDesc] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Retrieve user session or fallback
+  // Retrieve user session dynamically from localStorage (never hardcoded)
   const storedUserRaw = localStorage.getItem('user');
   const currentUser = storedUserRaw ? JSON.parse(storedUserRaw) : null;
-  const userEmail = currentUser?.email || 'ps9151299@gmail.com';
+  const userEmail = currentUser?.email || localStorage.getItem('current_user') || 'guest@testforge.io';
+  const userName = currentUser?.name || localStorage.getItem('user_name') || userEmail.split('@')[0];
 
   const fetchWorkspaces = async () => {
+    // 1. Instant local render: avoid hanging on network requests
+    const localSavedRaw = localStorage.getItem(`local_workspaces_${userEmail}`);
+    const localWorkspaces: WorkspaceItem[] = localSavedRaw ? JSON.parse(localSavedRaw) : [];
+    
+    if (localWorkspaces.length > 0) {
+      setWorkspaces(localWorkspaces);
+      setLoading(false);
+    }
+
     try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
+      // Short 2-second timeout to prevent UI freezes
       const res = await apiClient.get(
         `/api/v1/workspaces/?owner_email=${encodeURIComponent(userEmail)}`,
-        { headers }
+        { headers, timeout: 2000 }
       );
 
       const serverWorkspaces = Array.isArray(res.data) ? res.data : [];
 
-      // Combine server workspaces with local storage fallback
-      const localSavedRaw = localStorage.getItem(`local_workspaces_${userEmail}`);
-      const localWorkspaces: WorkspaceItem[] = localSavedRaw ? JSON.parse(localSavedRaw) : [];
-
       const map = new Map<string, WorkspaceItem>();
       [...serverWorkspaces, ...localWorkspaces].forEach((w) => map.set(w.id, w));
-      setWorkspaces(Array.from(map.values()));
+      const combined = Array.from(map.values());
+      setWorkspaces(combined);
+      localStorage.setItem(`local_workspaces_${userEmail}`, JSON.stringify(combined));
     } catch (err) {
-      console.warn('Backend fetch failed or offline, loading cached workspaces:', err);
-      const localSavedRaw = localStorage.getItem(`local_workspaces_${userEmail}`);
-      const fallbackWorkspaces: WorkspaceItem[] = localSavedRaw ? JSON.parse(localSavedRaw) : [];
-      setWorkspaces(fallbackWorkspaces);
+      console.warn('Backend offline or slow, using instant cached workspaces:', err);
+      setWorkspaces(localWorkspaces);
     } finally {
       setLoading(false);
     }
@@ -63,7 +69,7 @@ export const Dashboard: React.FC = () => {
 
   useEffect(() => {
     fetchWorkspaces();
-  }, []);
+  }, [userEmail]);
 
   // Handle Project Creation with Backend + Demo Fallback
   const handleCreateProject = async (e: React.FormEvent) => {
@@ -84,7 +90,7 @@ export const Dashboard: React.FC = () => {
     };
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
       await apiClient.post(
@@ -95,7 +101,7 @@ export const Dashboard: React.FC = () => {
           description: newWs.description,
           owner_email: userEmail,
         },
-        { headers, timeout: 6000 }
+        { headers, timeout: 2500 }
       );
     } catch (error) {
       console.warn('Backend API unavailable. Saving to local storage for demo persistence:', error);
@@ -127,9 +133,17 @@ export const Dashboard: React.FC = () => {
         JSON.stringify(currentLocal.filter((w) => w.id !== id))
       );
     }
+
+    // Clean up cached project data
+    localStorage.removeItem(`testforge_reqs_${id}`);
+    localStorage.removeItem(`reqs_${id}`);
+    localStorage.removeItem(`testforge_tests_${id}`);
+    localStorage.removeItem(`testforge_tasks_${id}`);
+    localStorage.removeItem(`testforge_strategy_${id}`);
+    localStorage.removeItem(`testforge_script_${id}`);
   };
 
-  // Helper for opening requirement file upload for the latest project
+  // Navigation handlers
   const handleOpenRequirements = () => {
     if (workspaces.length > 0) {
       navigate(`/projects/${workspaces[0].id}`);
@@ -146,14 +160,48 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  // Helper: Checks if requirements actually exist in localStorage for a workspace
+  const getWorkspaceReqCount = (ws: WorkspaceItem): number => {
+    if (ws.requirements_count && ws.requirements_count > 0) return ws.requirements_count;
+    const raw =
+      localStorage.getItem(`testforge_reqs_${ws.id}`) ||
+      localStorage.getItem(`reqs_${ws.id}`);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.length;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return 0;
+  };
+
+  // Helper: Checks if test cases actually exist in localStorage for a workspace
+  const getWorkspaceTestCount = (ws: WorkspaceItem): number => {
+    const reqs = getWorkspaceReqCount(ws);
+    if (reqs === 0) return 0;
+    if (ws.tests_count && ws.tests_count > 0) return ws.tests_count;
+    const raw = localStorage.getItem(`testforge_tests_${ws.id}`);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.length;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return 0;
+  };
+
   // Aggregate metrics
   const totalRequirements = useMemo(
-    () => workspaces.reduce((sum, w) => sum + (w.requirements_count || 0), 0),
+    () => workspaces.reduce((sum, w) => sum + getWorkspaceReqCount(w), 0),
     [workspaces]
   );
 
   const totalTests = useMemo(
-    () => workspaces.reduce((sum, w) => sum + (w.tests_count || 0), 0),
+    () => workspaces.reduce((sum, w) => sum + getWorkspaceTestCount(w), 0),
     [workspaces]
   );
 
@@ -167,18 +215,30 @@ export const Dashboard: React.FC = () => {
     let completedTasks = 0;
 
     workspaces.forEach((ws) => {
-      const total =
-        ws.total_tasks ??
-        (ws.requirements_count ? ws.requirements_count + (ws.tests_count || 0) : 0);
-      const done = ws.completed_tasks ?? (ws.tests_count || 0);
+      const reqCount = getWorkspaceReqCount(ws);
+      if (reqCount === 0) return;
 
+      const rawTasks = localStorage.getItem(`testforge_tasks_${ws.id}`);
+      if (rawTasks) {
+        try {
+          const parsed = JSON.parse(rawTasks);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            totalTasks += parsed.length;
+            completedTasks += parsed.filter((t: any) => t.status === 'completed').length;
+            return;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      const total = ws.total_tasks || 16;
+      const done = ws.completed_tasks || 0;
       totalTasks += total;
       completedTasks += done;
     });
 
-    if (totalTasks === 0) {
-      return 0;
-    }
+    if (totalTasks === 0) return 0;
 
     const calculated = Math.round((completedTasks / totalTasks) * 100);
     return Math.min(Math.max(calculated, 0), 100);
@@ -186,7 +246,10 @@ export const Dashboard: React.FC = () => {
 
   const handleSignOut = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('auth_token');
     localStorage.removeItem('user');
+    localStorage.removeItem('current_user');
+    localStorage.removeItem('user_name');
     navigate('/login');
   };
 
@@ -322,7 +385,7 @@ export const Dashboard: React.FC = () => {
           </nav>
         </div>
 
-        {/* User Card & Sign Out */}
+        {/* Dynamic User Profile & Sign Out */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div
@@ -333,13 +396,14 @@ export const Dashboard: React.FC = () => {
                 backgroundColor: '#4a302a',
                 color: '#fdf8f4',
                 fontWeight: 700,
-                fontSize: '12px',
+                fontSize: '13px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                textTransform: 'uppercase',
               }}
             >
-              {userEmail.substring(0, 1).toUpperCase()}
+              {userName.substring(0, 1) || 'U'}
             </div>
             <div style={{ overflow: 'hidden' }}>
               <p
@@ -352,7 +416,7 @@ export const Dashboard: React.FC = () => {
                   overflow: 'hidden',
                 }}
               >
-                {userEmail.split('@')[0]}
+                {userName}
               </p>
               <p style={{ margin: 0, fontSize: '10px', color: '#9f8881' }}>Pro Workspace</p>
             </div>
@@ -574,7 +638,7 @@ export const Dashboard: React.FC = () => {
             Your Projects
           </h3>
 
-          {loading ? (
+          {loading && workspaces.length === 0 ? (
             <p style={{ fontSize: '13px', color: '#8a7771' }}>Loading workspaces...</p>
           ) : workspaces.length === 0 ? (
             <div
@@ -601,119 +665,124 @@ export const Dashboard: React.FC = () => {
                 gap: '20px',
               }}
             >
-              {workspaces.map((ws) => (
-                <div
-                  key={ws.id}
-                  onClick={() => navigate(`/projects/${ws.id}`)}
-                  style={{
-                    backgroundColor: '#ffffff',
-                    borderRadius: '24px',
-                    padding: '24px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    minHeight: '180px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-                    cursor: 'pointer',
-                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                  }}
-                >
-                  <div>
+              {workspaces.map((ws) => {
+                const reqCount = getWorkspaceReqCount(ws);
+                const testCount = getWorkspaceTestCount(ws);
+
+                return (
+                  <div
+                    key={ws.id}
+                    onClick={() => navigate(`/projects/${ws.id}`)}
+                    style={{
+                      backgroundColor: '#ffffff',
+                      borderRadius: '24px',
+                      padding: '24px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      minHeight: '180px',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                      cursor: 'pointer',
+                      transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                    }}
+                  >
+                    <div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                        }}
+                      >
+                        <h4 style={{ fontSize: '17px', fontWeight: 700, margin: 0 }}>
+                          {ws.name}
+                        </h4>
+                        <div style={{ display: 'flex', gap: '8px', color: '#ab958e' }}>
+                          <span
+                            title="Delete Workspace"
+                            onClick={(e) => handleDeleteWorkspace(ws.id, e)}
+                            style={{ fontSize: '14px', cursor: 'pointer', padding: '2px 4px' }}
+                          >
+                            ✕
+                          </span>
+                        </div>
+                      </div>
+                      <p
+                        style={{
+                          fontSize: '13px',
+                          color: '#6e5d57',
+                          margin: '10px 0 0 0',
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {ws.description || 'Workspace for software requirement specifications.'}
+                      </p>
+                      <p
+                        style={{
+                          fontSize: '11px',
+                          color: '#a3938c',
+                          fontFamily: 'monospace',
+                          margin: '14px 0 0 0',
+                        }}
+                      >
+                        ID: {ws.id}
+                      </p>
+                    </div>
+
                     <div
                       style={{
                         display: 'flex',
+                        alignItems: 'center',
                         justifyContent: 'space-between',
-                        alignItems: 'flex-start',
+                        borderTop: '1px solid #f2ece6',
+                        paddingTop: '16px',
+                        marginTop: '16px',
+                        fontSize: '12px',
                       }}
                     >
-                      <h4 style={{ fontSize: '17px', fontWeight: 700, margin: 0 }}>
-                        {ws.name}
-                      </h4>
-                      <div style={{ display: 'flex', gap: '8px', color: '#ab958e' }}>
-                        <span
-                          title="Delete Workspace"
-                          onClick={(e) => handleDeleteWorkspace(ws.id, e)}
-                          style={{ fontSize: '14px', cursor: 'pointer', padding: '2px 4px' }}
+                      <span style={{ color: '#8a7771', fontWeight: 500 }}>
+                        {reqCount} Requirements • {testCount} Tests
+                      </span>
+                      <div style={{ display: 'flex', gap: '14px' }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/projects/${ws.id}`);
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#261612',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            padding: 0,
+                            fontSize: '12px',
+                          }}
                         >
-                          ✕
-                        </span>
+                          Specs →
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/projects/${ws.id}/generate`);
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#261612',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            padding: 0,
+                            fontSize: '12px',
+                          }}
+                        >
+                          Tests & Scripts →
+                        </button>
                       </div>
                     </div>
-                    <p
-                      style={{
-                        fontSize: '13px',
-                        color: '#6e5d57',
-                        margin: '10px 0 0 0',
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      {ws.description || 'Workspace for software requirement specifications.'}
-                    </p>
-                    <p
-                      style={{
-                        fontSize: '11px',
-                        color: '#a3938c',
-                        fontFamily: 'monospace',
-                        margin: '14px 0 0 0',
-                      }}
-                    >
-                      ID: {ws.id}
-                    </p>
                   </div>
-
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      borderTop: '1px solid #f2ece6',
-                      paddingTop: '16px',
-                      marginTop: '16px',
-                      fontSize: '12px',
-                    }}
-                  >
-                    <span style={{ color: '#8a7771', fontWeight: 500 }}>
-                      {ws.requirements_count || 0} Requirements • {ws.tests_count || 0} Tests
-                    </span>
-                    <div style={{ display: 'flex', gap: '14px' }}>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/projects/${ws.id}`);
-                        }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#261612',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          padding: 0,
-                          fontSize: '12px',
-                        }}
-                      >
-                        Specs →
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/projects/${ws.id}/generate`);
-                        }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#261612',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          padding: 0,
-                          fontSize: '12px',
-                        }}
-                      >
-                        Tests & Scripts →
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
