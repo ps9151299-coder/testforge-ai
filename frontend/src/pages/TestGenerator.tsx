@@ -32,7 +32,24 @@ export const TestGeneratorPage: React.FC = () => {
   const params = useParams<{ projectId?: string; id?: string }>();
   const activeProjectId: string = params.projectId || params.id || 'ws_project';
 
-  const [activeTab, setActiveTab] = useState<'strategy' | 'testcases' | 'tasks' | 'automation'>('tasks');
+  // Helper: Read stored requirements STRICTLY for this workspace ID only
+  const getStoredRequirements = (): any[] => {
+    const rawStored =
+      localStorage.getItem(`testforge_reqs_${activeProjectId}`) ||
+      localStorage.getItem(`reqs_${activeProjectId}`);
+    if (!rawStored) return [];
+    try {
+      const parsed = JSON.parse(rawStored);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const storedReqs = getStoredRequirements();
+  const hasUploadedSpecs = storedReqs.length > 0;
+
+  const [activeTab, setActiveTab] = useState<'strategy' | 'testcases' | 'tasks' | 'automation'>('strategy');
   const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -47,24 +64,6 @@ export const TestGeneratorPage: React.FC = () => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3200);
   };
-
-  // Helper: Read stored requirements for this workspace
-  const getStoredRequirements = (): any[] => {
-    const rawStored =
-      localStorage.getItem(`testforge_reqs_${activeProjectId}`) ||
-      localStorage.getItem(`reqs_${activeProjectId}`) ||
-      localStorage.getItem('active_requirements');
-    if (!rawStored) return [];
-    try {
-      const parsed = JSON.parse(rawStored);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  };
-
-  const storedReqs = getStoredRequirements();
-  const hasUploadedSpecs = storedReqs.length > 0;
 
   // 12 Exact Core Test Cases for E-Commerce Platform
   const baseTestCases: TestCase[] = [
@@ -362,17 +361,17 @@ test.describe('Synthesized End-to-End Test Suite', () => {
 });
 `;
 
-  // Strict State: Persistent across restarts with 16 tasks (never resets to 4)
+  // Safe State Initialization: If NO specs are uploaded for this project ID, state starts as empty/null
   const [strategy, setStrategy] = useState<StrategyData | null>(() => {
     if (!hasUploadedSpecs) return null;
     const saved = localStorage.getItem(`testforge_strategy_${activeProjectId}`);
-    return saved ? JSON.parse(saved) : baseStrategy;
+    return saved ? JSON.parse(saved) : null;
   });
 
   const [testCases, setTestCases] = useState<TestCase[]>(() => {
     if (!hasUploadedSpecs) return [];
     const saved = localStorage.getItem(`testforge_tests_${activeProjectId}`);
-    return saved ? JSON.parse(saved) : baseTestCases;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [tasks, setTasks] = useState<ProjectTask[]>(() => {
@@ -381,18 +380,18 @@ test.describe('Synthesized End-to-End Test Suite', () => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length >= 12) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch (e) {
         console.error(e);
       }
     }
-    return baseTasks;
+    return [];
   });
 
   const [automationScript, setAutomationScript] = useState<string>(() => {
     if (!hasUploadedSpecs) return '';
     const saved = localStorage.getItem(`testforge_script_${activeProjectId}`);
-    return saved || baseScript;
+    return saved || '';
   });
 
   // Synchronize counts to Dashboard
@@ -420,7 +419,7 @@ test.describe('Synthesized End-to-End Test Suite', () => {
     }
   }, [activeProjectId]);
 
-  // Synchronize state and persist 16 tasks on initial mount
+  // Sync on workspace change
   useEffect(() => {
     if (!hasUploadedSpecs) {
       setTestCases([]);
@@ -434,27 +433,27 @@ test.describe('Synthesized End-to-End Test Suite', () => {
       syncToDashboard(0, 0, 0);
     } else {
       const savedTasks = localStorage.getItem(`testforge_tasks_${activeProjectId}`);
-      let currentTasks = baseTasks;
+      const savedTests = localStorage.getItem(`testforge_tests_${activeProjectId}`);
+      const savedStrategy = localStorage.getItem(`testforge_strategy_${activeProjectId}`);
+      const savedScript = localStorage.getItem(`testforge_script_${activeProjectId}`);
 
-      if (savedTasks) {
-        try {
-          const parsed = JSON.parse(savedTasks);
-          if (Array.isArray(parsed) && parsed.length >= 12) {
-            currentTasks = parsed;
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      }
+      const currentTasks = savedTasks ? JSON.parse(savedTasks) : baseTasks;
+      const currentTests = savedTests ? JSON.parse(savedTests) : baseTestCases;
+      const currentStrategy = savedStrategy ? JSON.parse(savedStrategy) : baseStrategy;
+      const currentScript = savedScript || baseScript;
 
       setTasks(currentTasks);
-      localStorage.setItem(`testforge_tasks_${activeProjectId}`, JSON.stringify(currentTasks));
-      localStorage.setItem(`testforge_tests_${activeProjectId}`, JSON.stringify(baseTestCases));
-      localStorage.setItem(`testforge_strategy_${activeProjectId}`, JSON.stringify(baseStrategy));
-      localStorage.setItem(`testforge_script_${activeProjectId}`, baseScript);
+      setTestCases(currentTests);
+      setStrategy(currentStrategy);
+      setAutomationScript(currentScript);
 
-      const completed = currentTasks.filter((t) => t.status === 'completed').length;
-      syncToDashboard(baseTestCases.length, completed, currentTasks.length);
+      localStorage.setItem(`testforge_tasks_${activeProjectId}`, JSON.stringify(currentTasks));
+      localStorage.setItem(`testforge_tests_${activeProjectId}`, JSON.stringify(currentTests));
+      localStorage.setItem(`testforge_strategy_${activeProjectId}`, JSON.stringify(currentStrategy));
+      localStorage.setItem(`testforge_script_${activeProjectId}`, currentScript);
+
+      const completed = currentTasks.filter((t: ProjectTask) => t.status === 'completed').length;
+      syncToDashboard(currentTests.length, completed, currentTasks.length);
     }
   }, [hasUploadedSpecs, activeProjectId, syncToDashboard]);
 
@@ -486,7 +485,7 @@ test.describe('Synthesized End-to-End Test Suite', () => {
 
   const handleDownloadScript = () => {
     const cleanId = String(activeProjectId).replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    const filename = `${cleanId}_playwright_tests.ts`;
+    const filename = `${cleanId}_playwright_tests.spec.txt`;
     const blob = new Blob([automationScript], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -560,7 +559,6 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
     showToast(`Downloaded TestForge_Audit_Report.txt`);
   };
 
-  // Playwright Runner with Live Terminal Simulation
   const handleRunPlaywright = () => {
     setIsRunningTest(true);
     setTestStatus('running');
@@ -688,7 +686,6 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
                       setTasks(baseTasks);
                       setAutomationScript(baseScript);
 
-                      // Persist 16 tasks permanently
                       localStorage.setItem(`testforge_tasks_${activeProjectId}`, JSON.stringify(baseTasks));
                       localStorage.setItem(`testforge_tests_${activeProjectId}`, JSON.stringify(baseTestCases));
                       localStorage.setItem(`testforge_strategy_${activeProjectId}`, JSON.stringify(baseStrategy));
@@ -709,7 +706,7 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
             )}
           </div>
 
-          {/* If NO requirements have been uploaded yet, render clear Empty State */}
+          {/* Clean Empty State: Enforced until requirements are actually ingested */}
           {!hasUploadedSpecs || testCases.length === 0 ? (
             <div style={styles.emptyNotice}>
               <div style={{ fontSize: '38px', marginBottom: '12px' }}>📂</div>
@@ -820,7 +817,7 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
                 </div>
               )}
 
-              {/* TAB 3: Tasks Breakdown & Live Progress Roadmap (16 tasks preserved) */}
+              {/* TAB 3: Tasks Breakdown & Live Progress Roadmap */}
               {activeTab === 'tasks' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                   <div style={styles.roadmapCard}>
@@ -985,7 +982,7 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
                         📋 Copy
                       </button>
                       <button style={styles.downloadBtn} onClick={handleDownloadScript}>
-                        💾 .spec.ts
+                        💾 .spec.txt
                       </button>
                       <button style={styles.downloadBtn} onClick={handleExportCSV}>
                         📊 CSV
