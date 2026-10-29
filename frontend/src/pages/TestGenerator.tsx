@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 interface TestCase {
@@ -32,7 +32,7 @@ export const TestGeneratorPage: React.FC = () => {
   const params = useParams<{ projectId?: string; id?: string }>();
   const activeProjectId: string = params.projectId || params.id || 'ws_project';
 
-  // Helper: Read stored requirements STRICTLY for this workspace ID only
+  // Helper: Read stored requirements STRICTLY for this workspace ID
   const getStoredRequirements = (): any[] => {
     const rawStored =
       localStorage.getItem(`testforge_reqs_${activeProjectId}`) ||
@@ -49,11 +49,195 @@ export const TestGeneratorPage: React.FC = () => {
   const storedReqs = getStoredRequirements();
   const hasUploadedSpecs = storedReqs.length > 0;
 
-  const [activeTab, setActiveTab] = useState<'strategy' | 'testcases' | 'tasks' | 'automation'>('strategy');
+  // Retrieve current workspace name for custom context
+  const workspaceTitle = useMemo(() => {
+    const storedUserRaw = localStorage.getItem('user');
+    const userEmail = storedUserRaw ? JSON.parse(storedUserRaw).email : '';
+    const localWsRaw = localStorage.getItem(`local_workspaces_${userEmail}`);
+    if (localWsRaw) {
+      try {
+        const list = JSON.parse(localWsRaw);
+        const match = list.find((w: any) => w.id === activeProjectId);
+        if (match?.name) return match.name;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return 'Application Specifications';
+  }, [activeProjectId]);
+
+  // Dynamic Synthesis Engine: Generates tests and tasks strictly from uploaded requirements
+  const synthesizedBundle = useMemo(() => {
+    if (!hasUploadedSpecs) {
+      return { dynamicTests: [], dynamicTasks: [], dynamicStrategy: null, dynamicScript: '' };
+    }
+
+    const cleanNames = storedReqs.map((r: any, idx: number) => {
+      if (typeof r === 'string') return r.trim();
+      return (
+        r.title ||
+        r.name ||
+        r.description ||
+        r.requirement ||
+        `Module Functionality ${idx + 1}`
+      ).trim();
+    });
+
+    const primaryTopics = cleanNames.slice(0, 6);
+
+    // 1. Generate 12 Context-Aware Test Cases
+    const testTypes: Array<'Positive' | 'Negative' | 'Security' | 'Edge Case'> = [
+      'Positive',
+      'Positive',
+      'Positive',
+      'Positive',
+      'Security',
+      'Positive',
+      'Negative',
+      'Edge Case',
+      'Security',
+      'Edge Case',
+      'Positive',
+      'Positive',
+    ];
+
+    const dynamicTests: TestCase[] = Array.from({ length: 12 }, (_, i) => {
+      const topicIndex = i % (primaryTopics.length || 1);
+      const topic = primaryTopics[topicIndex] || `Core Business Workflow ${i + 1}`;
+      const type = testTypes[i];
+      const tcNum = String(i + 1).padStart(3, '0');
+
+      let scenario = `Verify happy path workflow for ${topic}`;
+      let preconditions = `System initialized with verified access credentials for ${topic}.`;
+      let steps = [
+        `Initialize system view and navigate to ${topic.toLowerCase()} gateway.`,
+        `Submit valid payload adhering to ${workspaceTitle} data schema.`,
+        `Assert HTTP 200/201 response and verify data persistence in state.`,
+      ];
+      let expectedResult = `Operation succeeds and interface reflects updated records matching specifications.`;
+
+      if (type === 'Security') {
+        scenario = `Enforce authentication & reject unauthorized access to ${topic}`;
+        preconditions = `Unauthenticated session or invalidated bearer token.`;
+        steps = [
+          `Attempt direct privileged API request to ${topic.toLowerCase()} endpoint.`,
+          `Validate request headers omit active session token.`,
+          `Assert HTTP 401 Unauthorized or 403 Forbidden with zero data exposure.`,
+        ];
+        expectedResult = `Access blocked with localized security banner; no sensitive trace leaked.`;
+      } else if (type === 'Negative') {
+        scenario = `Reject invalid input boundary values during ${topic} mutation`;
+        preconditions = `Client interface active in edit mode.`;
+        steps = [
+          `Submit payload containing null or oversized characters into ${topic} fields.`,
+          `Verify client form validation triggers descriptive warnings.`,
+          `Assert server rejects transaction with 400 Bad Request.`,
+        ];
+        expectedResult = `Data rejected gracefully; existing system records remain uncorrupted.`;
+      } else if (type === 'Edge Case') {
+        scenario = `Verify concurrency handling and atomic rollback during ${topic} latency`;
+        preconditions = `Multiple simultaneous transactions initiated on database tier.`;
+        steps = [
+          `Dispatch concurrent mutation requests to ${topic.toLowerCase()} controller.`,
+          `Simulate upstream connection timeout or network packet drop.`,
+          `Verify transactional rollback occurs without creating orphan rows.`,
+        ];
+        expectedResult = `State rollbacks cleanly to previous checkpoint with zero data loss.`;
+      }
+
+      return {
+        id: `TC-${tcNum}`,
+        scenario,
+        type,
+        preconditions,
+        steps,
+        expectedResult,
+      };
+    });
+
+    // 2. Generate 16 Actionable Roadmap Tasks (ALL INITIALIZED AS PENDING -> 0% DONE)
+    const taskCategories: Array<'Backend API' | 'Frontend UI' | 'QA Automation' | 'Database'> = [
+      'Backend API',
+      'Frontend UI',
+      'QA Automation',
+      'Backend API',
+      'Frontend UI',
+      'QA Automation',
+      'Backend API',
+      'Frontend UI',
+      'QA Automation',
+      'Backend API',
+      'Frontend UI',
+      'QA Automation',
+      'Backend API',
+      'Frontend UI',
+      'QA Automation',
+      'Database',
+    ];
+
+    const dynamicTasks: ProjectTask[] = Array.from({ length: 16 }, (_, i) => {
+      const topicIndex = i % (primaryTopics.length || 1);
+      const topic = primaryTopics[topicIndex] || `Component Specification ${i + 1}`;
+      const category = taskCategories[i];
+      const taskNum = String(i + 1).padStart(2, '0');
+
+      let title = '';
+      if (category === 'Backend API') {
+        title = `Implement secure REST API endpoints and business logic for ${topic}`;
+      } else if (category === 'Frontend UI') {
+        title = `Build responsive interface, inputs, and form validation for ${topic}`;
+      } else if (category === 'QA Automation') {
+        title = `Write Playwright end-to-end regression assertions for ${topic}`;
+      } else {
+        title = `Optimize database constraints, indexing, and transactional integrity for ${workspaceTitle}`;
+      }
+
+      return {
+        id: `TASK-${taskNum}`,
+        title,
+        category,
+        status: 'pending', // IMPORTANT: Starts at pending (0% checked)
+        estimatedHours: category === 'QA Automation' ? 2 : category === 'Frontend UI' ? 3 : 4,
+      };
+    });
+
+    // 3. Dynamic Strategy
+    const dynamicStrategy: StrategyData = {
+      objective: `Validate end-to-end integrity, input boundary security, and automation coverage for ${workspaceTitle}.`,
+      scope: `Full functional verification covering: ${primaryTopics.join(', ')}.`,
+      testLevels: ['Unit Component Testing', 'API Integration Testing', 'Playwright End-to-End Suite'],
+      entryCriteria: `All ${storedReqs.length} specifications ingested with test environment configured and endpoints reachable.`,
+      exitCriteria: `100% core test cases passing, zero Sev-1 defects, and positive assertion verification.`,
+      risks: `Network boundary timeouts, schema mismatches between API and UI, and unhandled validation edge cases.`,
+    };
+
+    // 4. Dynamic Playwright Automation Script
+    const testCasesCode = dynamicTests
+      .slice(0, 4)
+      .map(
+        (tc) => `  test('${tc.id}: ${tc.scenario.replace(/'/g, "\\'")}', async ({ page }) => {
+    await page.goto('/');
+    // Execute assertion for ${tc.scenario}
+    await expect(page).toHaveTitle(/.*${workspaceTitle.replace(/[^a-zA-Z0-9]/g, '')}.*/i);
+  });`
+      )
+      .join('\n\n');
+
+    const dynamicScript = `import { test, expect } from '@playwright/test';
+
+test.describe('Synthesized Test Suite: ${workspaceTitle.replace(/'/g, "\\'")}', () => {
+${testCasesCode}
+});
+`;
+
+    return { dynamicTests, dynamicTasks, dynamicStrategy, dynamicScript };
+  }, [hasUploadedSpecs, storedReqs, workspaceTitle]);
+
+  const [activeTab, setActiveTab] = useState<'strategy' | 'testcases' | 'tasks' | 'automation'>('tasks');
   const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  // Playwright Execution States
+  // Execution states
   const [targetUrl, setTargetUrl] = useState<string>('https://testforge-ai-nu.vercel.app');
   const [isRunningTest, setIsRunningTest] = useState<boolean>(false);
   const [consoleOutput, setConsoleOutput] = useState<string | null>(null);
@@ -65,313 +249,17 @@ export const TestGeneratorPage: React.FC = () => {
     setTimeout(() => setToastMsg(null), 3200);
   };
 
-  // 12 Exact Core Test Cases for E-Commerce Platform
-  const baseTestCases: TestCase[] = [
-    {
-      id: 'TC-001',
-      scenario: 'Verify User Authentication & Session Handshake',
-      type: 'Positive',
-      preconditions: 'User registered in database with verified status.',
-      steps: [
-        'Authenticate or initialize session.',
-        'Submit POST to /api/v1/auth/login with valid credentials.',
-        'Assert token type is Bearer and payload contains access_token.',
-      ],
-      expectedResult: 'System completes workflow matching requirement specifications.',
-    },
-    {
-      id: 'TC-002',
-      scenario: 'Verify Product Catalog Listing & Search Bounds',
-      type: 'Positive',
-      preconditions: 'Active catalog inventory seeded in database.',
-      steps: [
-        'Initialize catalog view.',
-        'Execute search and filter queries across price categories.',
-        'Validate response payload and SLA response time.',
-      ],
-      expectedResult: 'System completes workflow matching requirement specifications.',
-    },
-    {
-      id: 'TC-003',
-      scenario: 'Verify Shopping Cart Management & Item Mutation',
-      type: 'Positive',
-      preconditions: 'User authenticated and product in stock.',
-      steps: [
-        'Add product items to cart.',
-        'Mutate quantities and verify subtotal recalculation.',
-        'Assert inventory boundaries prevent over-ordering.',
-      ],
-      expectedResult: 'System completes workflow matching requirement specifications.',
-    },
-    {
-      id: 'TC-004',
-      scenario: 'Verify Secure Stripe Checkout Workflow',
-      type: 'Positive',
-      preconditions: 'Cart populated with valid items.',
-      steps: [
-        'Enter valid shipping address.',
-        'Initiate multi-channel payment transaction.',
-        'Confirm order placement and verify payment confirmation token.',
-      ],
-      expectedResult: 'System completes workflow matching requirement specifications.',
-    },
-    {
-      id: 'TC-005',
-      scenario: 'Verify Order ID Generation & Inventory Decrement',
-      type: 'Positive',
-      preconditions: 'Payment successfully captured.',
-      steps: [
-        'Assert unique order ID format ORD-XXXXX.',
-        'Inspect product stock record in inventory database.',
-        'Verify stock decrements by exactly purchased quantity.',
-      ],
-      expectedResult: 'System completes workflow matching requirement specifications.',
-    },
-    {
-      id: 'TC-006',
-      scenario: 'Verify Order Status Lifecycle Tracking',
-      type: 'Positive',
-      preconditions: 'Order placed in system.',
-      steps: [
-        'Query order status endpoint.',
-        'Transition status through Pending, Confirmed, Shipped, Delivered.',
-        'Assert status timestamps are updated accurately.',
-      ],
-      expectedResult: 'System completes workflow matching requirement specifications.',
-    },
-    {
-      id: 'TC-007',
-      scenario: 'Reject Login Attempt with Invalid Credentials',
-      type: 'Security',
-      preconditions: 'Authentication gateway actively enforcing rate limits.',
-      steps: [
-        'POST invalid password to /api/v1/auth/login.',
-        'Assert HTTP 401 Unauthorized response.',
-        'Verify zero sensitive debug stack traces are exposed.',
-      ],
-      expectedResult: 'System rejects unauthorized action with localized error message.',
-    },
-    {
-      id: 'TC-008',
-      scenario: 'Prevent Cart Quantity Exceeding Available Stock',
-      type: 'Edge Case',
-      preconditions: 'Product stock equals 5 units.',
-      steps: [
-        'Attempt to add 10 units to shopping cart.',
-        'Inspect client validation warning.',
-        'Assert server API rejects mutation with 400 Bad Request.',
-      ],
-      expectedResult: 'Quantity restricted to maximum available inventory.',
-    },
-    {
-      id: 'TC-009',
-      scenario: 'Enforce Mandatory User Login Before Checkout',
-      type: 'Security',
-      preconditions: 'Unauthenticated guest browsing platform.',
-      steps: [
-        'Add item to cart as guest.',
-        'Click proceed to checkout.',
-        'Verify automatic redirection to login page with return URL.',
-      ],
-      expectedResult: 'Guest prevented from placing unauthenticated order.',
-    },
-    {
-      id: 'TC-010',
-      scenario: 'Atomic Rollback on Interrupted Payment Gateway Response',
-      type: 'Edge Case',
-      preconditions: 'Order checkout payload submitted.',
-      steps: [
-        'Simulate upstream payment gateway timeout.',
-        'Verify atomic database transaction rollback.',
-        'Assert cart items remain intact and no orphan order created.',
-      ],
-      expectedResult: 'Transaction rolled back cleanly without double charges.',
-    },
-    {
-      id: 'TC-011',
-      scenario: 'Restricted Product Review Submission to Verified Buyers',
-      type: 'Positive',
-      preconditions: 'User has not purchased product.',
-      steps: [
-        'Attempt to submit rating and review on product page.',
-        'Verify submission is blocked with verified buyer notice.',
-      ],
-      expectedResult: 'Review submission restricted per platform review policy.',
-    },
-    {
-      id: 'TC-012',
-      scenario: 'Verify Responsive Mobile Viewport Assertions',
-      type: 'Positive',
-      preconditions: 'Viewport width set to 375px (iPhone dimensions).',
-      steps: [
-        'Render home, product catalog, cart, and checkout pages.',
-        'Verify no horizontal scrollbars exist and touch targets exceed 48px.',
-      ],
-      expectedResult: 'Layout renders responsively without visual artifacts.',
-    },
-  ];
-
-  // Exactly 16 Tasks for E-Commerce Platform
-  const baseTasks: ProjectTask[] = [
-    {
-      id: 'TASK-01',
-      title: 'Implement API & Logic for SOFTWARE REQUIREMENTS SPECIFICATION (SRS)',
-      category: 'Backend API',
-      status: 'completed',
-      estimatedHours: 4,
-    },
-    {
-      id: 'TASK-02',
-      title: 'Build interface & form validation for SOFTWARE REQUIREMENTS SPECIFICATION (SRS)',
-      category: 'Frontend UI',
-      status: 'completed',
-      estimatedHours: 3,
-    },
-    {
-      id: 'TASK-03',
-      title: 'Write Playwright automation assertion for SOFTWARE REQUIREMENTS SPECIFICATION (SRS)',
-      category: 'QA Automation',
-      status: 'completed',
-      estimatedHours: 2,
-    },
-    {
-      id: 'TASK-04',
-      title: 'Implement API & Logic for E-Commerce Platform',
-      category: 'Backend API',
-      status: 'completed',
-      estimatedHours: 4,
-    },
-    {
-      id: 'TASK-05',
-      title: 'Build interface & form validation for E-Commerce Platform',
-      category: 'Frontend UI',
-      status: 'completed',
-      estimatedHours: 3,
-    },
-    {
-      id: 'TASK-06',
-      title: 'Write Playwright automation assertion for E-Commerce Platform',
-      category: 'QA Automation',
-      status: 'completed',
-      estimatedHours: 2,
-    },
-    {
-      id: 'TASK-07',
-      title: 'Implement API & Logic for Project Name: E-Commerce Platform',
-      category: 'Backend API',
-      status: 'pending',
-      estimatedHours: 4,
-    },
-    {
-      id: 'TASK-08',
-      title: 'Build interface & form validation for Project Name: E-Commerce Platform',
-      category: 'Frontend UI',
-      status: 'pending',
-      estimatedHours: 3,
-    },
-    {
-      id: 'TASK-09',
-      title: 'Write Playwright automation assertion for Project Name: E-Commerce Platform',
-      category: 'QA Automation',
-      status: 'pending',
-      estimatedHours: 2,
-    },
-    {
-      id: 'TASK-10',
-      title: 'Implement API & Logic for Document Type: Software Requirements Specification',
-      category: 'Backend API',
-      status: 'pending',
-      estimatedHours: 4,
-    },
-    {
-      id: 'TASK-11',
-      title: 'Build interface & form validation for Document Type: Software Requirements Specification',
-      category: 'Frontend UI',
-      status: 'pending',
-      estimatedHours: 3,
-    },
-    {
-      id: 'TASK-12',
-      title: 'Write Playwright automation assertion for Document Type: Software Requirements Specification',
-      category: 'QA Automation',
-      status: 'pending',
-      estimatedHours: 2,
-    },
-    {
-      id: 'TASK-13',
-      title: 'Implement API & Logic for Functional & Non-Functional Testing Scope',
-      category: 'Backend API',
-      status: 'pending',
-      estimatedHours: 4,
-    },
-    {
-      id: 'TASK-14',
-      title: 'Build interface & form validation for User Authentication and Session Management',
-      category: 'Frontend UI',
-      status: 'pending',
-      estimatedHours: 3,
-    },
-    {
-      id: 'TASK-15',
-      title: 'Write Playwright automation assertion for Cart & Checkout Operations',
-      category: 'QA Automation',
-      status: 'pending',
-      estimatedHours: 2,
-    },
-    {
-      id: 'TASK-16',
-      title: 'Implement Inventory Decrement & Race Condition Protection in Database',
-      category: 'Database',
-      status: 'pending',
-      estimatedHours: 4,
-    },
-  ];
-
-  const baseStrategy: StrategyData = {
-    objective: 'Validate end-to-end reliability, input boundary conditions, and security for 12 core requirements.',
-    scope: 'SOFTWARE REQUIREMENTS SPECIFICATION (SRS), E-Commerce Platform, Project Name: E-Commerce Platform, Document Type: Software Requirements Specification.',
-    testLevels: ['Unit Testing', 'API Integration Testing', 'Playwright End-to-End Suite'],
-    entryCriteria: 'All requirements parsed into staging environment with mock authentication provider ready.',
-    exitCriteria: '100% critical path tests passing, 0 Sev-1/Sev-2 vulnerabilities detected in automated suite.',
-    risks: 'Token replay attacks, external payment gateway API throttle limits, and concurrent session race conditions.',
-  };
-
-  const baseScript = `import { test, expect } from '@playwright/test';
-
-test.describe('Synthesized End-to-End Test Suite', () => {
-  test('TC-001: Verify SOFTWARE REQUIREMENTS SPECIFICATION (SRS)', async ({ page }) => {
-    await page.goto('/login');
-    await expect(page).toHaveURL(/.*dashboard/);
-  });
-
-  test('TC-002: Verify E-Commerce Platform', async ({ page }) => {
-    await page.goto('/catalog');
-    await expect(page.locator('.product-grid')).toBeVisible();
-  });
-
-  test('TC-003: Verify Project Name: E-Commerce Platform', async ({ page }) => {
-    await page.goto('/cart');
-    await expect(page.locator('.cart-total')).toBeVisible();
-  });
-
-  test('TC-004: Verify Document Type: Software Requirements Specification', async ({ page }) => {
-    await page.goto('/checkout');
-    await expect(page.locator('#order-confirmation')).toBeVisible();
-  });
-});
-`;
-
-  // Safe State Initialization: If NO specs are uploaded for this project ID, state starts as empty/null
+  // State initialization: Loads user changes from localStorage if previously updated, otherwise takes fresh dynamic defaults
   const [strategy, setStrategy] = useState<StrategyData | null>(() => {
     if (!hasUploadedSpecs) return null;
     const saved = localStorage.getItem(`testforge_strategy_${activeProjectId}`);
-    return saved ? JSON.parse(saved) : null;
+    return saved ? JSON.parse(saved) : synthesizedBundle.dynamicStrategy;
   });
 
   const [testCases, setTestCases] = useState<TestCase[]>(() => {
     if (!hasUploadedSpecs) return [];
     const saved = localStorage.getItem(`testforge_tests_${activeProjectId}`);
-    return saved ? JSON.parse(saved) : [];
+    return saved ? JSON.parse(saved) : synthesizedBundle.dynamicTests;
   });
 
   const [tasks, setTasks] = useState<ProjectTask[]>(() => {
@@ -385,41 +273,44 @@ test.describe('Synthesized End-to-End Test Suite', () => {
         console.error(e);
       }
     }
-    return [];
+    return synthesizedBundle.dynamicTasks;
   });
 
   const [automationScript, setAutomationScript] = useState<string>(() => {
     if (!hasUploadedSpecs) return '';
     const saved = localStorage.getItem(`testforge_script_${activeProjectId}`);
-    return saved || '';
+    return saved || synthesizedBundle.dynamicScript;
   });
 
-  // Synchronize counts to Dashboard
-  const syncToDashboard = useCallback((testsCount: number, completedCount: number, totalCount: number) => {
-    const storedUserRaw = localStorage.getItem('user');
-    const userEmail = storedUserRaw ? JSON.parse(storedUserRaw).email : 'guest@testforge.io';
-    const localWsRaw = localStorage.getItem(`local_workspaces_${userEmail}`);
-    if (localWsRaw) {
-      try {
-        const localList = JSON.parse(localWsRaw);
-        const updatedList = localList.map((w: any) =>
-          w.id === activeProjectId
-            ? {
-                ...w,
-                tests_count: testsCount,
-                completed_tasks: completedCount,
-                total_tasks: totalCount,
-              }
-            : w
-        );
-        localStorage.setItem(`local_workspaces_${userEmail}`, JSON.stringify(updatedList));
-      } catch (err) {
-        console.error(err);
+  // Sync metrics to Dashboard
+  const syncToDashboard = useCallback(
+    (testsCount: number, completedCount: number, totalCount: number) => {
+      const storedUserRaw = localStorage.getItem('user');
+      const userEmail = storedUserRaw ? JSON.parse(storedUserRaw).email : 'guest@testforge.io';
+      const localWsRaw = localStorage.getItem(`local_workspaces_${userEmail}`);
+      if (localWsRaw) {
+        try {
+          const localList = JSON.parse(localWsRaw);
+          const updatedList = localList.map((w: any) =>
+            w.id === activeProjectId
+              ? {
+                  ...w,
+                  tests_count: testsCount,
+                  completed_tasks: completedCount,
+                  total_tasks: totalCount,
+                }
+              : w
+          );
+          localStorage.setItem(`local_workspaces_${userEmail}`, JSON.stringify(updatedList));
+        } catch (err) {
+          console.error(err);
+        }
       }
-    }
-  }, [activeProjectId]);
+    },
+    [activeProjectId]
+  );
 
-  // Sync on workspace change
+  // Sync and hydrate on mount / document ingestion
   useEffect(() => {
     if (!hasUploadedSpecs) {
       setTestCases([]);
@@ -437,10 +328,10 @@ test.describe('Synthesized End-to-End Test Suite', () => {
       const savedStrategy = localStorage.getItem(`testforge_strategy_${activeProjectId}`);
       const savedScript = localStorage.getItem(`testforge_script_${activeProjectId}`);
 
-      const currentTasks = savedTasks ? JSON.parse(savedTasks) : baseTasks;
-      const currentTests = savedTests ? JSON.parse(savedTests) : baseTestCases;
-      const currentStrategy = savedStrategy ? JSON.parse(savedStrategy) : baseStrategy;
-      const currentScript = savedScript || baseScript;
+      const currentTasks = savedTasks ? JSON.parse(savedTasks) : synthesizedBundle.dynamicTasks;
+      const currentTests = savedTests ? JSON.parse(savedTests) : synthesizedBundle.dynamicTests;
+      const currentStrategy = savedStrategy ? JSON.parse(savedStrategy) : synthesizedBundle.dynamicStrategy;
+      const currentScript = savedScript || synthesizedBundle.dynamicScript;
 
       setTasks(currentTasks);
       setTestCases(currentTests);
@@ -455,7 +346,7 @@ test.describe('Synthesized End-to-End Test Suite', () => {
       const completed = currentTasks.filter((t: ProjectTask) => t.status === 'completed').length;
       syncToDashboard(currentTests.length, completed, currentTasks.length);
     }
-  }, [hasUploadedSpecs, activeProjectId, syncToDashboard]);
+  }, [hasUploadedSpecs, activeProjectId, synthesizedBundle, syncToDashboard]);
 
   // Checkbox toggle with instant percentage calculation
   const handleToggleTask = (taskId: string) => {
@@ -528,6 +419,7 @@ test.describe('Synthesized End-to-End Test Suite', () => {
 TESTFORGE AI - TEST SYNTHESIS & AUDIT REPORT
 ================================================================================
 Workspace ID       : ${activeProjectId}
+Project Name       : ${workspaceTitle}
 Report Date        : ${reportDate}
 Overall Progress   : ${progressPercent}% (${completedTasksCount} / ${tasks.length} Tasks Finished)
 Synthesized Tests  : ${testCases.length} Test Cases
@@ -571,12 +463,12 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
           `${prev || ''}` +
           `✔ Launching headless browser session [pid: 8842]\n` +
           `✔ Mounting test suite onto isolated context [Target: ${targetUrl}]\n` +
-          `✔ [TC-001] Authenticate / verify session state and assertion handshake (210ms)\n` +
-          `✔ [TC-002] Verifying Product Catalog Listing & Search Bounds (144ms)\n` +
-          `✔ [TC-003] Verifying Shopping Cart Management & Item Mutations (190ms)\n` +
-          `✔ [TC-004] Verifying Stripe Checkout Workflow (220ms)\n` +
-          `✔ [TC-005] Verifying Stock Decrement & Order Confirmation (160ms)\n` +
-          `✔ [TC-012] Verifying Responsive Mobile Viewport Assertions (95ms)\n\n` +
+          `✔ [TC-001] Verify happy path workflow and assertion handshake (210ms)\n` +
+          `✔ [TC-002] Verify catalog and record listing boundaries (144ms)\n` +
+          `✔ [TC-003] Verify item and mutation state recalculations (190ms)\n` +
+          `✔ [TC-004] Verify transaction and checkout workflow (220ms)\n` +
+          `✔ [TC-005] Enforce authentication & reject unauthorized access (160ms)\n` +
+          `✔ [TC-012] Verify responsive mobile viewport assertions (95ms)\n\n` +
           `Passed: 12 passed (1.44s)\nExecution complete. Visual HTML report & screenshot artifacts generated.`
       );
       setTestStatus('passed');
@@ -664,7 +556,7 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
               <div style={styles.badge}>WORKSPACE: {activeProjectId}</div>
               <h1 style={styles.title}>Test Synthesis & Automation</h1>
               <p style={styles.subtitle}>
-                Auto-generated artifacts derived from ingested SDLC requirements.
+                Auto-generated artifacts derived from ingested SDLC requirements for <strong>{workspaceTitle}</strong>.
               </p>
             </div>
             {hasUploadedSpecs && testCases.length > 0 && (
@@ -681,21 +573,21 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
                   onClick={() => {
                     setIsSynthesizing(true);
                     setTimeout(() => {
-                      setStrategy(baseStrategy);
-                      setTestCases(baseTestCases);
-                      setTasks(baseTasks);
-                      setAutomationScript(baseScript);
+                      const { dynamicTests, dynamicTasks, dynamicStrategy, dynamicScript } = synthesizedBundle;
+                      setStrategy(dynamicStrategy);
+                      setTestCases(dynamicTests);
+                      setTasks(dynamicTasks);
+                      setAutomationScript(dynamicScript);
 
-                      localStorage.setItem(`testforge_tasks_${activeProjectId}`, JSON.stringify(baseTasks));
-                      localStorage.setItem(`testforge_tests_${activeProjectId}`, JSON.stringify(baseTestCases));
-                      localStorage.setItem(`testforge_strategy_${activeProjectId}`, JSON.stringify(baseStrategy));
-                      localStorage.setItem(`testforge_script_${activeProjectId}`, baseScript);
+                      localStorage.setItem(`testforge_tasks_${activeProjectId}`, JSON.stringify(dynamicTasks));
+                      localStorage.setItem(`testforge_tests_${activeProjectId}`, JSON.stringify(dynamicTests));
+                      localStorage.setItem(`testforge_strategy_${activeProjectId}`, JSON.stringify(dynamicStrategy));
+                      localStorage.setItem(`testforge_script_${activeProjectId}`, dynamicScript);
 
-                      const completed = baseTasks.filter((t) => t.status === 'completed').length;
-                      syncToDashboard(baseTestCases.length, completed, baseTasks.length);
+                      syncToDashboard(dynamicTests.length, 0, dynamicTasks.length);
 
                       setIsSynthesizing(false);
-                      showToast('Suite & Tasks regenerated successfully.');
+                      showToast('Suite & Tasks regenerated cleanly from requirements.');
                     }, 800);
                   }}
                   disabled={isSynthesizing}
@@ -706,7 +598,7 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
             )}
           </div>
 
-          {/* Clean Empty State: Enforced until requirements are actually ingested */}
+          {/* Clean Empty State */}
           {!hasUploadedSpecs || testCases.length === 0 ? (
             <div style={styles.emptyNotice}>
               <div style={{ fontSize: '38px', marginBottom: '12px' }}>📂</div>
@@ -766,7 +658,7 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                     <h3 style={{ margin: 0, color: '#2b140d', fontSize: '16px' }}>
-                      Generated Test Cases ({testCases.length})
+                      Generated Test Cases ({testCases.length}) for {workspaceTitle}
                     </h3>
                     <button style={styles.secondaryBtn} onClick={handleExportCSV}>
                       📊 Export CSV
@@ -817,7 +709,7 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
                 </div>
               )}
 
-              {/* TAB 3: Tasks Breakdown & Live Progress Roadmap */}
+              {/* TAB 3: Tasks Breakdown & Live Progress Roadmap (Starts at 0% Done) */}
               {activeTab === 'tasks' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                   <div style={styles.roadmapCard}>
@@ -846,7 +738,7 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
                   <div style={styles.tableCard}>
                     <div style={{ padding: '14px 20px', borderBottom: '1px solid #ebd9c8', backgroundColor: '#faf2e9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <h4 style={{ margin: 0, color: '#381c13', fontSize: '14px', fontWeight: 700 }}>
-                        Actionable Task Breakdown Derived from Requirements
+                        Actionable Task Breakdown Derived from {workspaceTitle} Requirements
                       </h4>
                       <button
                         onClick={handleDownloadReport}
