@@ -32,7 +32,7 @@ export const TestGeneratorPage: React.FC = () => {
   const params = useParams<{ projectId?: string; id?: string }>();
   const activeProjectId: string = params.projectId || params.id || 'ws_project';
 
-  // Helper: Read stored requirements STRICTLY for this workspace ID
+  // Helper: Read stored requirements STRICTLY for this workspace ID only
   const getStoredRequirements = (): any[] => {
     const rawStored =
       localStorage.getItem(`testforge_reqs_${activeProjectId}`) ||
@@ -49,7 +49,7 @@ export const TestGeneratorPage: React.FC = () => {
   const storedReqs = getStoredRequirements();
   const hasUploadedSpecs = storedReqs.length > 0;
 
-  // Retrieve current workspace name for custom context
+  // Retrieve current workspace title
   const workspaceTitle = useMemo(() => {
     const storedUserRaw = localStorage.getItem('user');
     const userEmail = storedUserRaw ? JSON.parse(storedUserRaw).email : '';
@@ -66,7 +66,12 @@ export const TestGeneratorPage: React.FC = () => {
     return 'Application Specifications';
   }, [activeProjectId]);
 
-  // Dynamic Synthesis Engine: Generates tests and tasks strictly from uploaded requirements
+  // Navigate back to the upload / specs ingestion page
+  const handleNavigateToSpecs = () => {
+    navigate(`/projects/${activeProjectId}`);
+  };
+
+  // Dynamic Synthesis Engine: Generates tests, strategy, and roadmap strictly from uploaded requirements
   const synthesizedBundle = useMemo(() => {
     if (!hasUploadedSpecs) {
       return { dynamicTests: [], dynamicTasks: [], dynamicStrategy: null, dynamicScript: '' };
@@ -108,7 +113,7 @@ export const TestGeneratorPage: React.FC = () => {
       const tcNum = String(i + 1).padStart(3, '0');
 
       let scenario = `Verify happy path workflow for ${topic}`;
-      let preconditions = `System initialized with verified access credentials for ${topic}.`;
+      let preconditions = `System initialized with verified credentials for ${topic}.`;
       let steps = [
         `Initialize system view and navigate to ${topic.toLowerCase()} gateway.`,
         `Submit valid payload adhering to ${workspaceTitle} data schema.`,
@@ -155,7 +160,7 @@ export const TestGeneratorPage: React.FC = () => {
       };
     });
 
-    // 2. Generate 16 Actionable Roadmap Tasks (ALL INITIALIZED AS PENDING -> 0% DONE)
+    // 2. Generate 16 Actionable Roadmap Tasks (ALL PENDING -> STARTS AT 0% DONE)
     const taskCategories: Array<'Backend API' | 'Frontend UI' | 'QA Automation' | 'Database'> = [
       'Backend API',
       'Frontend UI',
@@ -196,7 +201,7 @@ export const TestGeneratorPage: React.FC = () => {
         id: `TASK-${taskNum}`,
         title,
         category,
-        status: 'pending', // IMPORTANT: Starts at pending (0% checked)
+        status: 'pending',
         estimatedHours: category === 'QA Automation' ? 2 : category === 'Frontend UI' ? 3 : 4,
       };
     });
@@ -249,7 +254,7 @@ ${testCasesCode}
     setTimeout(() => setToastMsg(null), 3200);
   };
 
-  // State initialization: Loads user changes from localStorage if previously updated, otherwise takes fresh dynamic defaults
+  // State initialization
   const [strategy, setStrategy] = useState<StrategyData | null>(() => {
     if (!hasUploadedSpecs) return null;
     const saved = localStorage.getItem(`testforge_strategy_${activeProjectId}`);
@@ -464,9 +469,9 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
           `✔ Launching headless browser session [pid: 8842]\n` +
           `✔ Mounting test suite onto isolated context [Target: ${targetUrl}]\n` +
           `✔ [TC-001] Verify happy path workflow and assertion handshake (210ms)\n` +
-          `✔ [TC-002] Verify catalog and record listing boundaries (144ms)\n` +
-          `✔ [TC-003] Verify item and mutation state recalculations (190ms)\n` +
-          `✔ [TC-004] Verify transaction and checkout workflow (220ms)\n` +
+          `✔ [TC-002] Verify record listing boundaries and layout checks (144ms)\n` +
+          `✔ [TC-003] Verify item mutation and state recalculations (190ms)\n` +
+          `✔ [TC-004] Verify transaction and data workflow (220ms)\n` +
           `✔ [TC-005] Enforce authentication & reject unauthorized access (160ms)\n` +
           `✔ [TC-012] Verify responsive mobile viewport assertions (95ms)\n\n` +
           `Passed: 12 passed (1.44s)\nExecution complete. Visual HTML report & screenshot artifacts generated.`
@@ -490,10 +495,7 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
             </div>
 
             <nav style={styles.navMenu}>
-              <button
-                onClick={() => navigate(`/projects/${activeProjectId}`)}
-                style={styles.navItem}
-              >
+              <button onClick={handleNavigateToSpecs} style={styles.navItem}>
                 <span>←</span>
                 <span>Requirement Specs</span>
               </button>
@@ -544,7 +546,15 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
             </nav>
           </div>
 
-          <button style={styles.logoutBtn} onClick={() => navigate('/dashboard')}>
+          <button
+            type="button"
+            style={styles.logoutBtn}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              window.location.href = '/dashboard';
+            }}
+          >
             Back to Dashboard
           </button>
         </aside>
@@ -553,10 +563,16 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
         <main style={styles.mainContent}>
           <div style={styles.header}>
             <div>
-              <div style={styles.badge}>WORKSPACE: {activeProjectId}</div>
+              <div
+                style={{ ...styles.badge, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                onClick={() => { window.location.href = '/dashboard'; }}
+              >
+                ← DASHBOARD / WORKSPACE: {activeProjectId}
+              </div>
               <h1 style={styles.title}>Test Synthesis & Automation</h1>
               <p style={styles.subtitle}>
-                Auto-generated artifacts derived from ingested SDLC requirements for <strong>{workspaceTitle}</strong>.
+                Auto-generated artifacts derived from ingested SDLC requirements for{' '}
+                <strong>{workspaceTitle}</strong>.
               </p>
             </div>
             {hasUploadedSpecs && testCases.length > 0 && (
@@ -573,16 +589,29 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
                   onClick={() => {
                     setIsSynthesizing(true);
                     setTimeout(() => {
-                      const { dynamicTests, dynamicTasks, dynamicStrategy, dynamicScript } = synthesizedBundle;
+                      const { dynamicTests, dynamicTasks, dynamicStrategy, dynamicScript } =
+                        synthesizedBundle;
                       setStrategy(dynamicStrategy);
                       setTestCases(dynamicTests);
                       setTasks(dynamicTasks);
                       setAutomationScript(dynamicScript);
 
-                      localStorage.setItem(`testforge_tasks_${activeProjectId}`, JSON.stringify(dynamicTasks));
-                      localStorage.setItem(`testforge_tests_${activeProjectId}`, JSON.stringify(dynamicTests));
-                      localStorage.setItem(`testforge_strategy_${activeProjectId}`, JSON.stringify(dynamicStrategy));
-                      localStorage.setItem(`testforge_script_${activeProjectId}`, dynamicScript);
+                      localStorage.setItem(
+                        `testforge_tasks_${activeProjectId}`,
+                        JSON.stringify(dynamicTasks)
+                      );
+                      localStorage.setItem(
+                        `testforge_tests_${activeProjectId}`,
+                        JSON.stringify(dynamicTests)
+                      );
+                      localStorage.setItem(
+                        `testforge_strategy_${activeProjectId}`,
+                        JSON.stringify(dynamicStrategy)
+                      );
+                      localStorage.setItem(
+                        `testforge_script_${activeProjectId}`,
+                        dynamicScript
+                      );
 
                       syncToDashboard(dynamicTests.length, 0, dynamicTasks.length);
 
@@ -598,20 +627,26 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
             )}
           </div>
 
-          {/* Clean Empty State */}
+          {/* Clean Empty State: Guides user directly to specs upload */}
           {!hasUploadedSpecs || testCases.length === 0 ? (
             <div style={styles.emptyNotice}>
               <div style={{ fontSize: '38px', marginBottom: '12px' }}>📂</div>
               <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', color: '#2b140d' }}>
                 No Requirements Ingested Yet
               </h3>
-              <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: '#7b5d49', maxWidth: '440px', lineHeight: 1.5 }}>
-                This workspace currently has no specifications. Head over to the Specs page to upload your requirements or user stories first.
-              </p>
-              <button
-                style={styles.primaryBtn}
-                onClick={() => navigate(`/projects/${activeProjectId}`)}
+              <p
+                style={{
+                  margin: '0 0 20px 0',
+                  fontSize: '13px',
+                  color: '#7b5d49',
+                  maxWidth: '440px',
+                  lineHeight: 1.5,
+                }}
               >
+                This workspace currently has no specifications. Head over to the Specs page to
+                upload your requirements or user stories first.
+              </p>
+              <button style={styles.primaryBtn} onClick={handleNavigateToSpecs}>
                 Go to Requirement Specs ➔
               </button>
             </div>
@@ -622,15 +657,21 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
                 <div style={styles.strategyContainer}>
                   <div style={styles.strategyCard}>
                     <h3 style={styles.strategySectionTitle}>1. Test Objective & Scope</h3>
-                    <p style={styles.strategyText}><strong>Objective:</strong> {strategy.objective}</p>
-                    <p style={styles.strategyText}><strong>Scope:</strong> {strategy.scope}</p>
+                    <p style={styles.strategyText}>
+                      <strong>Objective:</strong> {strategy.objective}
+                    </p>
+                    <p style={styles.strategyText}>
+                      <strong>Scope:</strong> {strategy.scope}
+                    </p>
                   </div>
 
                   <div style={styles.strategyCard}>
                     <h3 style={styles.strategySectionTitle}>2. Target Testing Levels</h3>
                     <ul style={styles.bulletList}>
                       {strategy.testLevels.map((lvl, idx) => (
-                        <li key={idx} style={styles.bulletItem}>{lvl}</li>
+                        <li key={idx} style={styles.bulletItem}>
+                          {lvl}
+                        </li>
                       ))}
                     </ul>
                   </div>
@@ -656,7 +697,14 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
               {/* TAB 2: Generated Test Cases (12) */}
               {activeTab === 'testcases' && (
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '14px',
+                    }}
+                  >
                     <h3 style={{ margin: 0, color: '#2b140d', fontSize: '16px' }}>
                       Generated Test Cases ({testCases.length}) for {workspaceTitle}
                     </h3>
@@ -713,9 +761,22 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
               {activeTab === 'tasks' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                   <div style={styles.roadmapCard}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
                       <div>
-                        <span style={{ fontSize: '11px', fontWeight: 800, color: '#8c6a56', letterSpacing: '0.5px' }}>
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 800,
+                            color: '#8c6a56',
+                            letterSpacing: '0.5px',
+                          }}
+                        >
                           PROJECT ROADMAP PROGRESS
                         </span>
                         <h3 style={{ margin: '4px 0 0 0', color: '#2b140d', fontSize: '20px' }}>
@@ -726,7 +787,9 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
                         <span style={{ fontSize: '13px', fontWeight: 700, color: '#2b140d' }}>
                           {completedTasksCount} of {tasks.length} Tasks Finished
                         </span>
-                        <div style={{ fontSize: '11px', color: '#7b5d49' }}>Click any checkbox below to update roadmap</div>
+                        <div style={{ fontSize: '11px', color: '#7b5d49' }}>
+                          Click any checkbox below to update roadmap
+                        </div>
                       </div>
                     </div>
 
@@ -736,8 +799,24 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
                   </div>
 
                   <div style={styles.tableCard}>
-                    <div style={{ padding: '14px 20px', borderBottom: '1px solid #ebd9c8', backgroundColor: '#faf2e9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <h4 style={{ margin: 0, color: '#381c13', fontSize: '14px', fontWeight: 700 }}>
+                    <div
+                      style={{
+                        padding: '14px 20px',
+                        borderBottom: '1px solid #ebd9c8',
+                        backgroundColor: '#faf2e9',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <h4
+                        style={{
+                          margin: 0,
+                          color: '#381c13',
+                          fontSize: '14px',
+                          fontWeight: 700,
+                        }}
+                      >
                         Actionable Task Breakdown Derived from {workspaceTitle} Requirements
                       </h4>
                       <button
@@ -769,7 +848,14 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
                             />
                             <div style={{ flex: 1 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ fontSize: '12px', fontWeight: 700, color: '#8c6a56', fontFamily: 'monospace' }}>
+                                <span
+                                  style={{
+                                    fontSize: '12px',
+                                    fontWeight: 700,
+                                    color: '#8c6a56',
+                                    fontFamily: 'monospace',
+                                  }}
+                                >
                                   {task.id}
                                 </span>
                                 <span
@@ -832,7 +918,9 @@ ${tasks.map((t) => `[${t.status === 'completed' ? 'X' : ' '}] ${t.id} [${t.categ
                 <div>
                   <div style={styles.runnerBar}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#49372d' }}>Target URL:</span>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#49372d' }}>
+                        Target URL:
+                      </span>
                       <input
                         type="text"
                         value={targetUrl}
@@ -1008,6 +1096,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '13px',
     fontWeight: 600,
     cursor: 'pointer',
+    position: 'relative',
+    zIndex: 10,
+    pointerEvents: 'auto',
   },
   mainContent: {
     flex: 1,

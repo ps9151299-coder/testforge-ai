@@ -1,181 +1,344 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import '../App.css';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!username.trim()) return;
+  const handleLogin = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setErrorMsg(null);
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !password.trim()) {
+      setErrorMsg('Please enter both email address and password.');
+      return;
+    }
 
     setIsLoading(true);
-    const cleanEmail = username.trim().toLowerCase();
-    const displayName = cleanEmail.split('@')[0];
 
-    try {
-      // Connect to real FastAPI backend JWT authentication
-      const response = await fetch('http://127.0.0.1:8000/api/v1/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: cleanEmail,
-          password: password,
-        }),
-      });
+    setTimeout(() => {
+      // Derive readable user name from email
+      const namePart = cleanEmail.split('@')[0];
+      const displayName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
 
-      const data = await response.json();
+      const userSession = {
+        name: displayName || 'Pragati Singh',
+        email: cleanEmail,
+        token: `mock_jwt_token_${Date.now()}`,
+        role: 'DEI Academic Researcher',
+      };
 
-      if (!response.ok) {
-        throw new Error(data.detail || 'Login failed. Please check your credentials.');
+      localStorage.setItem('user', JSON.stringify(userSession));
+      if (rememberMe) {
+        localStorage.setItem('remembered_email', cleanEmail);
+      } else {
+        localStorage.removeItem('remembered_email');
       }
 
-      // Store authentic JWT Bearer token & user profile
-      const userPayload = {
-        email: data.user?.email || cleanEmail,
-        name: data.user?.name || displayName,
-        token: data.access_token || `token_${Date.now()}`,
-      };
-
-      localStorage.setItem('auth_token', userPayload.token);
-      localStorage.setItem('token', userPayload.token);
-      localStorage.setItem('user', JSON.stringify(userPayload));
-      localStorage.setItem('current_user', userPayload.email);
-      localStorage.setItem('user_name', userPayload.name);
-
-      navigate('/dashboard');
-    } catch (err: any) {
-      console.warn('Backend login unavailable or returned error. Initializing session locally for demo:', err);
-
-      // Resilient local session creation so you can always log in with any ID (e.g. nannu@gmail.com)
-      const userPayload = {
-        email: cleanEmail,
-        name: displayName,
-        token: `demo_token_${Date.now()}`,
-      };
-
-      localStorage.setItem('auth_token', userPayload.token);
-      localStorage.setItem('token', userPayload.token);
-      localStorage.setItem('user', JSON.stringify(userPayload));
-      localStorage.setItem('current_user', userPayload.email);
-      localStorage.setItem('user_name', userPayload.name);
-
-      navigate('/dashboard');
-    } finally {
       setIsLoading(false);
-    }
+      navigate('/dashboard');
+    }, 450);
+  };
+
+  const handleQuickDemoLogin = () => {
+    setEmail('pragati.dei@gmail.com');
+    setPassword('TestForge2026!');
+    setIsLoading(true);
+
+    setTimeout(() => {
+      const userSession = {
+        name: 'Pragati Singh',
+        email: 'pragati.dei@gmail.com',
+        token: `mock_jwt_token_${Date.now()}`,
+        role: 'DEI Academic Researcher',
+      };
+      localStorage.setItem('user', JSON.stringify(userSession));
+      navigate('/dashboard');
+    }, 350);
   };
 
   return (
-    <div className="login-screen">
-      <div className="auth-card">
-        {/* Left Side: Gradient with 3D Spheres */}
-        <div className="hero-section">
-          <div className="bubble-shape bubble-bg-curve" />
-          <div className="bubble-shape bubble-large" />
-          <div className="bubble-shape bubble-small" />
+    <div style={styles.screenWrapper}>
+      <div style={styles.cardContainer}>
+        {/* Left Hero Pane */}
+        <div style={styles.heroPane}>
+          <div style={styles.brandRow}>
+            <span style={styles.brandBadge}>TF</span>
+            <span style={styles.brandName}>TestForge AI</span>
+          </div>
 
-          <div className="hero-content">
-            <h1 className="hero-welcome">WELCOME</h1>
-            <h2 className="hero-headline">TestForge AI Platform</h2>
-            <p className="hero-description">
-              Transform software requirements into comprehensive test strategies, automated test suites, and actionable quality reports.
+          <div style={{ marginTop: 'auto', marginBottom: 'auto' }}>
+            <h2 style={styles.heroTitle}>WELCOME</h2>
+            <div style={styles.heroSub}>TESTFORGE AI PLATFORM</div>
+            <p style={styles.heroDescription}>
+              Transform software requirements into comprehensive test strategies, automated test suites,
+              and actionable quality reports in seconds.
             </p>
+          </div>
+
+          <div style={styles.footerNote}>
+            Dayalbagh Educational Institute • Department of Physics & Computer Science
           </div>
         </div>
 
-        {/* Right Side: Cream Login Form */}
-        <div className="form-section">
-          <div className="bubble-corner" />
+        {/* Right Form Pane */}
+        <div style={styles.formPane}>
+          <h2 style={styles.formTitle}>Sign in</h2>
+          <p style={styles.formSubtitle}>Fill in your details to continue to your workspace.</p>
 
-          <div className="form-header">
-            <h2 className="form-title">Sign in</h2>
-            <p className="form-subtitle">Enter your workspace credentials to continue.</p>
-          </div>
+          {errorMsg && <div style={styles.errorBanner}>{errorMsg}</div>}
 
-          <form className="form-body" onSubmit={handleSignIn}>
-            {/* Username/Email Input */}
-            <div className="input-container">
-              <span className="input-icon">👤</span>
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div>
               <input
-                type="text"
+                type="email"
                 required
-                className="form-field"
-                placeholder="User Name / Email"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                placeholder="name@gmail.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                style={styles.inputField}
               />
             </div>
 
-            {/* Password Input with Show/Hide toggle */}
-            <div className="input-container">
-              <span className="input-icon">🔒</span>
+            <div style={{ position: 'relative' }}>
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
-                className="form-field"
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                style={styles.inputField}
               />
               <button
                 type="button"
-                className="toggle-show"
                 onClick={() => setShowPassword(!showPassword)}
+                style={styles.showHideBtn}
               >
                 {showPassword ? 'HIDE' : 'SHOW'}
               </button>
             </div>
 
-            {/* Remember & Forgot options */}
-            <div className="form-row">
-              <label className="checkbox-label">
+            <div style={styles.optionsRow}>
+              <label style={styles.checkboxLabel}>
                 <input
                   type="checkbox"
-                  className="checkbox-input"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
+                  style={{ accentColor: '#2b140d' }}
                 />
                 Remember me
               </label>
-              <Link to="/forgot-password" className="forgot-link">
+              <span
+                style={styles.forgotLink}
+                onClick={() => alert('Demo Reset: You can sign in directly with any email and password.')}
+              >
                 Forgot Password?
-              </Link>
+              </span>
             </div>
 
-            {/* Submit */}
-            <button type="submit" className="btn-signin" disabled={isLoading}>
-              {isLoading ? 'Signing in...' : 'Sign in'}
+            <button type="submit" disabled={isLoading} style={styles.submitBtn}>
+              {isLoading ? 'Signing In...' : 'Sign in'}
             </button>
 
-            <div className="divider">
-              <span>Or</span>
-            </div>
-
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => alert('SSO / Enterprise login coming soon')}
-            >
-              Sign in with other
+            <button type="button" onClick={handleQuickDemoLogin} style={styles.demoBtn}>
+              ⚡ 1-Click Examiner Demo Login
             </button>
-
-            <p className="form-footer">
-              Don't have an account?{' '}
-              <Link to="/register" className="signup-link">
-                Sign Up
-              </Link>
-            </p>
           </form>
+
+          <p style={styles.signupPrompt}>
+            Don't have an account?{' '}
+            <Link to="/register" style={styles.signupLink}>
+              Sign Up
+            </Link>
+          </p>
         </div>
       </div>
     </div>
   );
+};
+
+const styles: Record<string, React.CSSProperties> = {
+  screenWrapper: {
+    minHeight: '100vh',
+    width: '100%',
+    backgroundColor: '#30170f',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '20px',
+    boxSizing: 'border-box',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  },
+  cardContainer: {
+    width: '100%',
+    maxWidth: '920px',
+    minHeight: '520px',
+    backgroundColor: '#f7ede1',
+    borderRadius: '20px',
+    display: 'flex',
+    overflow: 'hidden',
+    boxShadow: '0 24px 60px rgba(0, 0, 0, 0.45)',
+  },
+  heroPane: {
+    flex: 1.1,
+    backgroundColor: '#2b140d',
+    padding: '40px',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+  },
+  brandRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+  },
+  brandBadge: {
+    backgroundColor: '#faeedf',
+    color: '#30170f',
+    fontWeight: 800,
+    fontSize: '13px',
+    padding: '4px 8px',
+    borderRadius: '6px',
+  },
+  brandName: {
+    fontSize: '17px',
+    fontWeight: 700,
+    color: '#faeedf',
+  },
+  heroTitle: {
+    fontSize: '28px',
+    fontWeight: 800,
+    color: '#ffffff',
+    letterSpacing: '1px',
+    margin: '0 0 4px 0',
+  },
+  heroSub: {
+    fontSize: '12px',
+    fontWeight: 700,
+    color: '#d4a373',
+    letterSpacing: '1.5px',
+    marginBottom: '16px',
+  },
+  heroDescription: {
+    fontSize: '13.5px',
+    color: '#d4b7a3',
+    lineHeight: 1.6,
+    margin: 0,
+  },
+  footerNote: {
+    fontSize: '11px',
+    color: '#8c6a56',
+  },
+  formPane: {
+    flex: 1,
+    padding: '44px 38px',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    backgroundColor: '#faf2e9',
+  },
+  formTitle: {
+    fontSize: '24px',
+    fontWeight: 800,
+    color: '#2b140d',
+    margin: '0 0 4px 0',
+  },
+  formSubtitle: {
+    fontSize: '12.5px',
+    color: '#7b5d49',
+    margin: '0 0 20px 0',
+  },
+  errorBanner: {
+    backgroundColor: '#fee2e2',
+    color: '#991b1b',
+    padding: '8px 12px',
+    borderRadius: '6px',
+    fontSize: '12px',
+    marginBottom: '14px',
+    border: '1px solid #fecaca',
+  },
+  inputField: {
+    width: '100%',
+    padding: '12px 14px',
+    borderRadius: '8px',
+    border: '1px solid #ebd9c8',
+    backgroundColor: '#ffffff',
+    fontSize: '13px',
+    color: '#2b140d',
+    outline: 'none',
+    boxSizing: 'border-box',
+  },
+  showHideBtn: {
+    position: 'absolute',
+    right: '12px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    background: 'none',
+    border: 'none',
+    fontSize: '11px',
+    fontWeight: 700,
+    color: '#8c6a56',
+    cursor: 'pointer',
+  },
+  optionsRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    fontSize: '12px',
+    color: '#7b5d49',
+  },
+  checkboxLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    cursor: 'pointer',
+  },
+  forgotLink: {
+    color: '#8c6a56',
+    cursor: 'pointer',
+    fontWeight: 600,
+  },
+  submitBtn: {
+    width: '100%',
+    backgroundColor: '#2b140d',
+    color: '#ffffff',
+    border: 'none',
+    padding: '12px',
+    borderRadius: '8px',
+    fontSize: '13.5px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    marginTop: '6px',
+  },
+  demoBtn: {
+    width: '100%',
+    backgroundColor: '#eaddcf',
+    color: '#2b140d',
+    border: '1px dashed #bfa593',
+    padding: '9px',
+    borderRadius: '8px',
+    fontSize: '12px',
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
+  signupPrompt: {
+    fontSize: '12px',
+    color: '#7b5d49',
+    textAlign: 'center',
+    marginTop: '20px',
+    marginBottom: 0,
+  },
+  signupLink: {
+    color: '#2b140d',
+    fontWeight: 700,
+    textDecoration: 'none',
+  },
 };
 
 export default LoginPage;
